@@ -1,5 +1,5 @@
 services:
-  template-app:
+  app:
     build: .
     volumes:
       - ./src:/app/src

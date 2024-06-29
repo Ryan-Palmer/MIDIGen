@@ -4,6 +4,10 @@ WORKDIR /app
 
 RUN apt-get update
 RUN apt-get install -y dotnet-sdk-8.0
+RUN apt-get install software-properties-common -y
+RUN add-apt-repository ppa:mscore-ubuntu/mscore-stable
+RUN apt-get update
+RUN apt-get install musescore -y
 
 COPY pip-packages.txt pip-packages.txt
 RUN pip install --upgrade pip
