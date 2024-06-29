@@ -19,7 +19,7 @@ To run on Windows you will need:
 ### Ubuntu
 If you need to `apt-get` any apps, add them to the `Dockerfile` where indicated.
 
-### Pip
+### Python
 Add any pip packages you need to `pip-packages.txt` before building the container.
 
 ## Build and Run
@@ -35,5 +35,10 @@ You can also visit that URL in your browser if you would rather use the Jupyter 
 
 > If you see some errors about the .NET SDK version and Python Kernel being invalid after first launch, don't worry, the installer is just catching up. You don't need to install anything.
 
-## Files
+## Workspace files
 Any files you put in the `src` folder will be mounted and available to the Docker container / Jupyter server.
+
+### Adding VSCode extensions
+After you launch the DevContainer you can select extensions in VSCode, click their settings cog and select "Add to `devcontainer.json`".
+
+Once you have done this for all the extensions you need, open the command pallete and run `Dev Containers: Rebuild and Reopen in Container`.
