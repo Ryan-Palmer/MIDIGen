@@ -2,6 +2,8 @@
 
 A Jupyter notebook exploring MIDI next-note prediction as a way of learning about topics such as tokenisation and transformer architectures.
 
+It takes heavy inspiration from [MusicAutobot](https://github.com/bearpelican/musicautobot/tree/master).
+
 It is set up as a dev container so the whole environment can be launched with a single command and connected to using VSCode (or through the browser).
 
 ## Requirements
