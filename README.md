@@ -1,14 +1,16 @@
-# Pytorch DevContainer template
+# MIDIGen Next Note Prediction
 
+A Jupyter notebook exploring MIDI next-note prediction as a way of learning about topics such as tokenisation and transformer architectures.
+
+It is set up as a dev container so the whole environment can be launched with a single command and connected to using VSCode (or through the browser).
+
+## Requirements
 To run on Windows you will need:
 
 - An Nvidia GPU with latest drivers installed
 - Docker Desktop
 - WSL2
 - VSCode with the DevContainers extension
-
-## Files
-Any files you put in the `src` folder will be available to the Docker container and the Jupyter server.
 
 ## Dependencies
 
@@ -27,7 +29,12 @@ Once it has finished launching then VSCode should auto-select the Jupyter Python
 
 If it doesn't do this automatically, set the kernel of your Polyglot Notebooks session to `http://127.0.0.1:8888/lab?token=dev`.
 
+You can also visit that URL in your browser if you would rather use the Jupyter Labs IDE.
+
 ### VSCode extensions
 After you launch the DevContainer (see below) you can select extensions in VSCode, click their settings cog and select "Add to `devcontainer.json`".
 
 Once you have done this for all the extensions you need, open the command pallete and run `Dev Containers: Rebuild and Reopen in Container`.
+
+## Files
+Any files you put in the `src` folder will be mounted and available to the Docker container / Jupyter server.
