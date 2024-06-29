@@ -14,7 +14,7 @@ To run on Windows you will need:
 - WSL2
 - VSCode with the DevContainers extension
 
-## Dependencies
+## Adding dependencies
 
 ### Ubuntu
 If you need to `apt-get` any apps, add them to the `Dockerfile` where indicated.
@@ -39,6 +39,6 @@ You can also visit that URL in your browser if you would rather use the Jupyter 
 Any files you put in the `src` folder will be mounted and available to the Docker container / Jupyter server.
 
 ### Adding VSCode extensions
-After you launch the DevContainer you can select extensions in VSCode, click their settings cog and select "Add to `devcontainer.json`".
+After you launch the DevContainer you can select extensions in VSCode, click their settings cog and select `Add to devcontainer.json`.
 
 Once you have done this for all the extensions you need, open the command pallete and run `Dev Containers: Rebuild and Reopen in Container`.
