@@ -42,7 +42,10 @@
 	// "shutdownAction": "none",
 
 	// Uncomment the next line to run commands after the container is created.
-	"postCreateCommand": "jupyter lab --ip=0.0.0.0 --allow-root --no-browser --LabApp.token='dev'"
+	// "postCreateCommand": ""
+
+	// Uncomment the next line to run commands after the container is started.
+	"postStartCommand": "jupyter lab --ip=0.0.0.0 --allow-root --no-browser --LabApp.token='dev'"
 
 	// Configure tool-specific properties.
 	// "customizations": {},

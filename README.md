@@ -27,9 +27,15 @@ To build and launch the VSCode and Jupyter servers in a dev container, open the 
 
 Once it has finished launching then VSCode should auto-select the Jupyter Python kernel and prompt you for the Jupyter password, which is `dev`.
 
-> This can be changed in the Docker file or ommitted completely to force Jupyter to create a new GUID key which be displayed along with the server URL in the terminal.
+> This password can be changed in the Docker file or ommitted completely to force Jupyter to create a new GUID key which be displayed along with the server URL in the terminal.
 
-If it doesn't do this automatically, set the kernel of your Polyglot Notebooks session to `http://127.0.0.1:8888/lab?token=dev`.
+If it doesn't do this automatically, set the kernel of your Polyglot Notebooks by 
+- Clicking the kernel selector at the top right of the notebook.
+- Selecting `Existing Jupyter Server`.
+- Scroll down and select `Enter the URL of the running Jupyter Server`.
+- Paste in `http://127.0.0.1:8888/lab?token=dev`
+- Press enter again to select `127.0.0.1` (which will be prefilled)
+- Select `Python 3 (ipykernel)`.
 
 You can also visit that URL in your browser if you would rather use the Jupyter Labs IDE.
 
