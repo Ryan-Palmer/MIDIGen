@@ -2,7 +2,7 @@ services:
   app:
     build: .
     volumes:
-      - ./src:/app/src
+      - ./src:/src
     deploy:
       resources:
         reservations:

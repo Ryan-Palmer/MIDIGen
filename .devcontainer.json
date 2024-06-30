@@ -15,7 +15,7 @@
 
 	// The optional 'workspaceFolder' property is the path VS Code should open by default when
 	// connected. This is typically a file mount in .devcontainer/docker-compose.yml
-	"workspaceFolder": "/app/src",
+	"workspaceFolder": "/src",
 	"customizations": {
 		"vscode": {
 			"extensions": [
@@ -43,9 +43,6 @@
 
 	// Uncomment the next line to run commands after the container is created.
 	// "postCreateCommand": ""
-
-	// Uncomment the next line to run commands after the container is started.
-	"postStartCommand": "jupyter lab --ip=0.0.0.0 --allow-root --no-browser --LabApp.token='dev'"
 
 	// Configure tool-specific properties.
 	// "customizations": {},
