@@ -109,33 +109,37 @@ def stream_to_sparse_enc(stream_score, note_size=MIDI_NOTE_COUNT, sample_freq=DI
 def sparse_to_position_enc(sparse_score, skip_last_rest=True):
 
     def encode_timestep(acc, timestep):
-        encoded_timesteps, wait_count = acc
-        encoded_timestep = timestep_to_position_enc(timestep) # pass in all notes for both instruments, merged list returned
+        encoded_timesteps, wait_count, tidx = acc
+        encoded_timestep = timestep_to_position_enc(timestep, tidx) # pass in all notes for both instruments, merged list returned
         if len(encoded_timestep) == 0: # i.e. all zeroes at time step
             wait_count += 1
         else:
             if wait_count > 0:
-                encoded_timesteps.append([SEPARATOR_IDX, wait_count])
+                separator_position = tidx - wait_count
+                encoded_timesteps.append([SEPARATOR_IDX, wait_count, separator_position]) # add rests
             encoded_timesteps.extend(encoded_timestep)
             wait_count = 1
-        return encoded_timesteps, wait_count
+        
+        return encoded_timesteps, wait_count, tidx + 1
     
-    encoded_timesteps, final_wait_count = reduce(encode_timestep, sparse_score, ([], 0))
+    # encoded_timesteps is a list of [note, duration, position]
+    encoded_timesteps, final_wait_count, final_tidx = reduce(encode_timestep, sparse_score, ([], 0, 0))
 
     if final_wait_count > 0 and not skip_last_rest:
-        encoded_timesteps.append([SEPARATOR_IDX, final_wait_count]) # add trailing rests
+        encoded_timesteps.append([SEPARATOR_IDX, final_wait_count, final_tidx]) # add trailing rests
 
-    return np.array(encoded_timesteps).reshape(-1, 2) # reshaping. Just in case result is empty
+    return np.array(encoded_timesteps).reshape(-1, 3) # reshaping. Just in case result is empty
     
-def timestep_to_position_enc(timestep, note_range=PIANO_RANGE):
+def timestep_to_position_enc(timestep, tidx, note_range=PIANO_RANGE):
 
     note_min, note_max = note_range
+    position = tidx
 
     def encode_note_data(note_data, active_note_idx):
         instrument, pitch = active_note_idx
         duration = timestep[instrument, pitch]
         if pitch >= note_min and pitch < note_max:
-            note_data.append([pitch, duration, instrument])
+            note_data.append([pitch, duration, position, instrument])
         return note_data
     
     active_note_idxs = zip(*timestep.nonzero())
@@ -144,10 +148,12 @@ def timestep_to_position_enc(timestep, note_range=PIANO_RANGE):
 
     # Dropping instrument information for simplicity.
     # MusicAutobot allows different encoding schemes which include instrument number and split pitch into class / octave.
-    return [n[:2] for n in sorted_notes]
+    return [n[:3] for n in sorted_notes]
 
 def position_to_idx_enc(note_position_score, vocab):
-    note_idx_score = note_position_score.copy()
+    nps = note_position_score.copy()
+    note_idx_score = nps[:, :2] # Note and duration
+    pos_score = np.repeat(nps[:, 2], 2) # Double up positions for note and duration
     note_min_idx, _ = vocab.note_range
     dur_min_idx, _ = vocab.duration_range
     
@@ -155,11 +161,18 @@ def position_to_idx_enc(note_position_score, vocab):
     # Tokens are the same order as notes and note_min_idx offset is constant so we can apply in one go.
     # Using broadcasting to add the 1D [note_min_idx, dur_min_idx] to the 2D note_idx_score.
     note_idx_score += np.array([note_min_idx, dur_min_idx])
-    
-    prefix =  np.array([vocab.sos_idx])
-    suffix = np.array([vocab.eos_idx])
 
-    return np.concatenate([prefix, note_idx_score.reshape(-1), suffix])
+    prefix =  np.array([vocab.sos_idx])
+    prefix_position = np.array([0])
+
+    suffix = np.array([vocab.eos_idx])
+    suffix_position = np.array([pos_score[-1]])
+
+    note_idx_score = np.concatenate([prefix, note_idx_score.reshape(-1), suffix])
+    pos_score = np.concatenate([prefix_position, pos_score.reshape(-1), suffix_position])
+
+    # Returning note and positions in stacked array as we want to embed them separately in the model
+    return np.stack([note_idx_score, pos_score], axis=1)
 
 def import_midi_file(file_path):
     midifile = m21.midi.MidiFile()
