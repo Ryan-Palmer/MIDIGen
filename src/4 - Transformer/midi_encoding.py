@@ -122,7 +122,7 @@ def sparse_to_position_enc(sparse_score, skip_last_rest=True):
         
         return encoded_timesteps, wait_count, tidx + 1
     
-    # encoded_timesteps is a list of [note, duration, position]
+    # encoded_timesteps is an array of (note, duration, position)
     encoded_timesteps, final_wait_count, final_tidx = reduce(encode_timestep, sparse_score, ([], 0, 0))
 
     if final_wait_count > 0 and not skip_last_rest:
@@ -153,7 +153,7 @@ def timestep_to_position_enc(timestep, tidx, note_range=PIANO_RANGE):
 def position_to_idx_enc(note_position_score, vocab):
     nps = note_position_score.copy()
     note_idx_score = nps[:, :2] # Note and duration
-    pos_score = np.repeat(nps[:, 2], 2) # Double up positions for note and duration
+    pos_score = np.repeat(nps[:, 2], 2).reshape(-1) # Double up positions for note and duration
     note_min_idx, _ = vocab.note_range
     dur_min_idx, _ = vocab.duration_range
     
@@ -163,13 +163,13 @@ def position_to_idx_enc(note_position_score, vocab):
     note_idx_score += np.array([note_min_idx, dur_min_idx])
 
     prefix =  np.array([vocab.sos_idx])
-    prefix_position = np.array([0])
+    prefix_position = np.array([pos_score[0]])
 
     suffix = np.array([vocab.eos_idx])
     suffix_position = np.array([pos_score[-1]])
 
     note_idx_score = np.concatenate([prefix, note_idx_score.reshape(-1), suffix])
-    pos_score = np.concatenate([prefix_position, pos_score.reshape(-1), suffix_position])
+    pos_score = np.concatenate([prefix_position, pos_score, suffix_position])
 
     # Returning note and positions in stacked array as we want to embed them separately in the model
     return np.stack([note_idx_score, pos_score], axis=1)
