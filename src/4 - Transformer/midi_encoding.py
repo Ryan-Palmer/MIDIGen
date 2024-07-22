@@ -122,7 +122,7 @@ def sparse_to_position_enc(sparse_score, skip_last_rest=True):
         
         return encoded_timesteps, wait_count, tidx + 1
     
-    # encoded_timesteps is an array of (note, duration, position)
+    # encoded_timesteps is an array of [ pitch, duration, position ]
     encoded_timesteps, final_wait_count, final_tidx = reduce(encode_timestep, sparse_score, ([], 0, 0))
 
     if final_wait_count > 0 and not skip_last_rest:
@@ -153,7 +153,7 @@ def timestep_to_position_enc(timestep, tidx, note_range=PIANO_RANGE):
 def position_to_idx_enc(note_position_score, vocab):
     nps = note_position_score.copy()
     note_idx_score = nps[:, :2] # Note and duration
-    pos_score = np.repeat(nps[:, 2], 2).reshape(-1) # Double up positions for note and duration
+    pos_score = np.repeat(nps[:, 2], 2) # Double up positions for note and duration
     note_min_idx, _ = vocab.note_range
     dur_min_idx, _ = vocab.duration_range
     
