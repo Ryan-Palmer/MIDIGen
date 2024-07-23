@@ -11,10 +11,8 @@ musescore_path = '/usr/bin/mscore'
 m21.environment.set('musicxmlPath', musescore_path)
 m21.environment.set('musescoreDirectPNGPath', musescore_path)
 
-BEATS_PER_BAR = 4 # beats per bar
-DIVISIONS_PER_QUARTER = 4 # i.e. 4 beats per bar and 4 divisions per beat gives 16 divisions per bar
 MIDI_NOTE_COUNT = 128
-MAX_NOTE_DUR = (8*BEATS_PER_BAR*DIVISIONS_PER_QUARTER)
+MAX_NOTE_DUR = 128
 SEPARATOR_IDX = -1 # separator value for numpy encoding
 PIANO_RANGE = (21, 108)
 SOS = '<|sos|>' # Start of sequence
@@ -25,13 +23,11 @@ PAD = '<|pad|>' # Padding to ensure blocks are the same size
 SPECIAL_TOKENS = [SOS, EOS, PAD, SEP]
 MIDI_NOTE_COUNT = 128
 NOTE_TOKENS = [f'n{i}' for i in range(MIDI_NOTE_COUNT)]
-DURATION_SIZE = 8 * BEATS_PER_BAR * DIVISIONS_PER_QUARTER + 1 # 8 bars of sixteenth (semiquaver) notes + 1 for 0 length
-DURATION_TOKENS = [f'd{i}' for i in range(DURATION_SIZE)]
+DURATION_TOKENS = [f'd{i}' for i in range(128)]
 NOTE_START, NOTE_END = NOTE_TOKENS[0], NOTE_TOKENS[-1]
 DURATION_START, DURATION_END = DURATION_TOKENS[0], DURATION_TOKENS[-1]
 ALL_TOKENS = SPECIAL_TOKENS + NOTE_TOKENS + DURATION_TOKENS
 ALL_TOKENS[0:8]
-TIMESIG = f'{BEATS_PER_BAR}/4'
 
 class MusicVocab():
     def __init__(self):
@@ -68,7 +64,7 @@ class MusicVocab():
     @property
     def size(self): return len(self.itos)
 
-def stream_to_sparse_enc(stream_score, note_size=MIDI_NOTE_COUNT, sample_freq=DIVISIONS_PER_QUARTER, max_note_dur=MAX_NOTE_DUR):    
+def stream_to_sparse_enc(stream_score, divisions_per_quarter):    
     # Time is measured in quarter notes since the start of the piece
     # Original states that we are assuming 4/4 time but I don't see why that would be the case. BPB isn't used here.
 
@@ -78,12 +74,12 @@ def stream_to_sparse_enc(stream_score, note_size=MIDI_NOTE_COUNT, sample_freq=DI
         stream_score.flatten().getElementsByClass('Chord').stream().highestTime)
     
     # Calculate the maximum number of time steps
-    max_timestep = round(highest_time * sample_freq) + 1
-    sparse_score = np.zeros((max_timestep, len(stream_score.parts), note_size), dtype=np.int32)
+    max_timestep = round(highest_time * divisions_per_quarter) + 1
+    sparse_score = np.zeros((max_timestep, len(stream_score.parts), MIDI_NOTE_COUNT), dtype=np.int32)
 
     # Convert a note to a tuple of (pitch,offset,duration)
     def note_data(pitch, note):
-        return (pitch.midi, int(round(note.offset*sample_freq)), int(round(note.duration.quarterLength*sample_freq)))
+        return (pitch.midi, int(round(note.offset*divisions_per_quarter)), int(round(note.duration.quarterLength*divisions_per_quarter)))
 
     for idx, part in enumerate(stream_score.parts):
         
@@ -100,23 +96,33 @@ def stream_to_sparse_enc(stream_score, note_size=MIDI_NOTE_COUNT, sample_freq=DI
         for note in notes_sorted:
             if note is not None:
                 pitch, timestep, duration = note
-                clamped_duration = max_note_dur if max_note_dur is not None and duration > max_note_dur else duration
+                clamped_duration = MAX_NOTE_DUR if duration > MAX_NOTE_DUR else duration
                 sparse_score[timestep, idx, pitch] = clamped_duration
     
     return sparse_score
 
+def tidx_to_beat(tidx, beats_per_measure, divisions_per_quarter):
+    return tidx % (beats_per_measure * divisions_per_quarter)
+
+def tidx_to_bar(tidx, beats_per_measure, divisions_per_quarter):
+    return tidx // (beats_per_measure * divisions_per_quarter)
+
 # Pass in the 'one-hot' encoded numpy score
-def sparse_to_position_enc(sparse_score, skip_last_rest=True):
+def sparse_to_position_enc(sparse_score, beats_per_measure, divisions_per_quarter, skip_last_rest=True):
 
     def encode_timestep(acc, timestep):
         encoded_timesteps, wait_count, tidx = acc
-        encoded_timestep = timestep_to_position_enc(timestep, tidx) # pass in all notes for both instruments, merged list returned
+        bar = tidx_to_bar(tidx, beats_per_measure, divisions_per_quarter)
+        beat = tidx_to_beat(tidx, beats_per_measure, divisions_per_quarter)
+        encoded_timestep = timestep_to_position_enc(timestep, bar, beat) # pass in all notes for both instruments, merged list returned
         if len(encoded_timestep) == 0: # i.e. all zeroes at time step
             wait_count += 1
         else:
             if wait_count > 0:
                 separator_position = tidx - wait_count
-                encoded_timesteps.append([SEPARATOR_IDX, wait_count, separator_position]) # add rests
+                bar = tidx_to_bar(separator_position, beats_per_measure, divisions_per_quarter)
+                beat = tidx_to_beat(separator_position, beats_per_measure, divisions_per_quarter)
+                encoded_timesteps.append([SEPARATOR_IDX, wait_count, bar, beat]) # add rests
             encoded_timesteps.extend(encoded_timestep)
             wait_count = 1
         
@@ -124,22 +130,22 @@ def sparse_to_position_enc(sparse_score, skip_last_rest=True):
     
     # encoded_timesteps is an array of [ pitch, duration, position ]
     encoded_timesteps, final_wait_count, final_tidx = reduce(encode_timestep, sparse_score, ([], 0, 0))
-
     if final_wait_count > 0 and not skip_last_rest:
-        encoded_timesteps.append([SEPARATOR_IDX, final_wait_count, final_tidx]) # add trailing rests
+        final_bar = tidx_to_bar(final_tidx, beats_per_measure, divisions_per_quarter)
+        final_beat = tidx_to_beat(final_tidx, beats_per_measure, divisions_per_quarter)
+        encoded_timesteps.append([SEPARATOR_IDX, final_wait_count, final_bar, final_beat]) # add trailing rests
 
-    return np.array(encoded_timesteps).reshape(-1, 3) # reshaping. Just in case result is empty
+    return np.array(encoded_timesteps).reshape(-1, 4) # reshaping. Just in case result is empty
     
-def timestep_to_position_enc(timestep, tidx, note_range=PIANO_RANGE):
+def timestep_to_position_enc(timestep, bar, beat):
 
-    note_min, note_max = note_range
-    position = tidx
+    note_min, note_max = PIANO_RANGE
 
     def encode_note_data(note_data, active_note_idx):
         instrument, pitch = active_note_idx
         duration = timestep[instrument, pitch]
         if pitch >= note_min and pitch < note_max:
-            note_data.append([pitch, duration, position, instrument])
+            note_data.append([pitch, duration, bar, beat, instrument])
         return note_data
     
     active_note_idxs = zip(*timestep.nonzero())
@@ -148,12 +154,13 @@ def timestep_to_position_enc(timestep, tidx, note_range=PIANO_RANGE):
 
     # Dropping instrument information for simplicity.
     # MusicAutobot allows different encoding schemes which include instrument number and split pitch into class / octave.
-    return [n[:3] for n in sorted_notes]
+    return [n[:4] for n in sorted_notes]
 
 def position_to_idx_enc(note_position_score, vocab):
     nps = note_position_score.copy()
     note_idx_score = nps[:, :2] # Note and duration
-    pos_score = np.repeat(nps[:, 2], 2) # Double up positions for note and duration
+    bar_score = np.repeat(nps[:, 2], 2) # Double up bars for note and duration
+    beat_score = np.repeat(nps[:, 3], 2) # Double up beats for note and duration
     note_min_idx, _ = vocab.note_range
     dur_min_idx, _ = vocab.duration_range
     
@@ -163,16 +170,19 @@ def position_to_idx_enc(note_position_score, vocab):
     note_idx_score += np.array([note_min_idx, dur_min_idx])
 
     prefix =  np.array([vocab.sos_idx])
-    prefix_position = np.array([pos_score[0]])
+    prefix_bar = np.array([bar_score[0]])
+    prefix_beat = np.array([beat_score[0]])
 
     suffix = np.array([vocab.eos_idx])
-    suffix_position = np.array([pos_score[-1]])
+    suffix_bar = np.array([bar_score[-1]])
+    suffix_beat = np.array([beat_score[-1]])
 
     note_idx_score = np.concatenate([prefix, note_idx_score.reshape(-1), suffix])
-    pos_score = np.concatenate([prefix_position, pos_score, suffix_position])
+    bar_score = np.concatenate([prefix_bar, bar_score, suffix_bar])
+    beat_score = np.concatenate([prefix_beat, beat_score, suffix_beat])
 
     # Returning note and positions in stacked array as we want to embed them separately in the model
-    return np.stack([note_idx_score, pos_score], axis=1)
+    return np.stack([note_idx_score, bar_score, beat_score], axis=1)
 
 def import_midi_file(file_path):
     midifile = m21.midi.MidiFile()
@@ -190,8 +200,11 @@ def midifile_to_stream(midifile):
 def midifile_to_idx_score(file_path, vocab):
     midifile = import_midi_file(file_path)
     stream = midifile_to_stream(midifile)
-    sparse_score = stream_to_sparse_enc(stream)
-    note_pos_score = sparse_to_position_enc(sparse_score)
+    timeSignature = stream.getTimeSignatures()[0].ratioString.split('/')
+    beats_per_measure = int(timeSignature[0])
+    divisions_per_quarter = int(timeSignature[1])
+    sparse_score = stream_to_sparse_enc(stream, divisions_per_quarter)
+    note_pos_score = sparse_to_position_enc(sparse_score, beats_per_measure, divisions_per_quarter)
     return position_to_idx_enc(note_pos_score, vocab)
 
 # Combining notes with different durations into a single chord may overwrite conflicting durations.
