@@ -12,22 +12,21 @@ m21.environment.set('musicxmlPath', musescore_path)
 m21.environment.set('musescoreDirectPNGPath', musescore_path)
 
 BEATS_PER_BAR = 4 # beats per bar
-DIVISIONS_PER_QUARTER = 4 # i.e. 4 beats per bar and 4 divisions per beat gives 16 divisions per bar
+SAMPLES_PER_BEAT = 8 # i.e. 4 beats per bar and 8 samples per beat gives a resolution of 32 samples per bar
 MIDI_NOTE_COUNT = 128
-MAX_NOTE_DUR = (8*BEATS_PER_BAR*DIVISIONS_PER_QUARTER)
+MAX_NOTE_DUR = 8 * BEATS_PER_BAR * SAMPLES_PER_BEAT # 8 bars of 32nd notes
 SEPARATOR_IDX = -1 # separator value for numpy encoding
-PIANO_RANGE = (21, 108)
+MIDI_NOTE_RANGE = (0, 127)
 SOS = '<|sos|>' # Start of sequence
 EOS = '<|eos|>' # End of sequence
 SEP = '<|sep|>' # End of timestep (required for polyphony). Note index -1
 PAD = '<|pad|>' # Padding to ensure blocks are the same size
  # SEP token must be last, i.e. one place before note tokens, so that adding the note offset still works when encoding
 SPECIAL_TOKENS = [SOS, EOS, PAD, SEP]
-MIDI_NOTE_COUNT = 128
 NOTE_TOKENS = [f'n{i}' for i in range(MIDI_NOTE_COUNT)]
-DURATION_SIZE = 8 * BEATS_PER_BAR * DIVISIONS_PER_QUARTER + 1 # 8 bars of sixteenth (semiquaver) notes + 1 for 0 length
+DURATION_SIZE = MAX_NOTE_DUR + 1 # + 1 for 0 length
 DURATION_TOKENS = [f'd{i}' for i in range(DURATION_SIZE)]
-NOTE_START, NOTE_END = NOTE_TOKENS[0], NOTE_TOKENS[-1]
+NOTE_START, NOTE_END = NOTE_TOKENS[0], NOTE_TOKENS[-1] 
 DURATION_START, DURATION_END = DURATION_TOKENS[0], DURATION_TOKENS[-1]
 ALL_TOKENS = SPECIAL_TOKENS + NOTE_TOKENS + DURATION_TOKENS
 ALL_TOKENS[0:8]
@@ -68,9 +67,8 @@ class MusicVocab():
     @property
     def size(self): return len(self.itos)
 
-def stream_to_sparse_enc(stream_score, note_size=MIDI_NOTE_COUNT, sample_freq=DIVISIONS_PER_QUARTER, max_note_dur=MAX_NOTE_DUR):    
+def stream_to_sparse_enc(stream_score, note_size=MIDI_NOTE_COUNT, sample_freq=SAMPLES_PER_BEAT, max_note_dur=MAX_NOTE_DUR):    
     # Time is measured in quarter notes since the start of the piece
-    # Original states that we are assuming 4/4 time but I don't see why that would be the case. BPB isn't used here.
 
     # (MusicAutobot author:) TODO: need to order by instruments most played and filter out percussion or include the channel
     highest_time = max(
@@ -130,7 +128,7 @@ def sparse_to_position_enc(sparse_score, skip_last_rest=True):
 
     return np.array(encoded_timesteps).reshape(-1, 3) # reshaping. Just in case result is empty
     
-def timestep_to_position_enc(timestep, tidx, note_range=PIANO_RANGE):
+def timestep_to_position_enc(timestep, tidx, note_range=MIDI_NOTE_RANGE):
 
     note_min, note_max = note_range
     position = tidx
@@ -231,7 +229,7 @@ def sparse_instrument_to_stream_part(sparse_instrument_score, step_duration):
     return part
 
 def sparse_to_stream_enc(sparse_score, bpm=120):
-    step_duration = m21.duration.Duration(1. / DIVISIONS_PER_QUARTER)
+    step_duration = m21.duration.Duration(1. / SAMPLES_PER_BEAT)
     stream = m21.stream.Score()
     stream.append(m21.meter.TimeSignature(TIMESIG))
     stream.append(m21.tempo.MetronomeMark(number=bpm))
