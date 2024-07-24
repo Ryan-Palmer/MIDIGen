@@ -1,4 +1,6 @@
-# NOTE - This is almost the same code as from the previous notebooks, however it doesn't pad the score up to block_size as it is for a transformer model.
+# NOTE - This is almost the same code as from the previous notebooks, however it doesn't
+# pad the idx score SOS up to block_size as it is for a transformer model and so can handle
+# variable length sequences. Also increased the resolution to 32nd notes.
 
 import numpy as np
 from itertools import chain
@@ -12,7 +14,7 @@ m21.environment.set('musicxmlPath', musescore_path)
 m21.environment.set('musescoreDirectPNGPath', musescore_path)
 
 BEATS_PER_BAR = 4 # beats per bar
-SAMPLES_PER_BEAT = 8 # i.e. 4 beats per bar and 8 samples per beat gives a resolution of 32 samples per bar
+SAMPLES_PER_BEAT = 8 # i.e. 4 beats per bar and 8 samples per beat gives a resolution of 32nd notes
 MIDI_NOTE_COUNT = 128
 MAX_NOTE_DUR = 8 * BEATS_PER_BAR * SAMPLES_PER_BEAT # 8 bars of 32nd notes
 SEPARATOR_IDX = -1 # separator value for numpy encoding
