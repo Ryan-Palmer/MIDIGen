@@ -4,3 +4,4 @@ src/data/midi/vg_large/
 src/data/numpy/
 src/__pycache__/
 src/4 - Transformer/__pycache__/
+src/data/model/midi_transformer_1.tar
