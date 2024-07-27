@@ -5,3 +5,4 @@ src/data/numpy/
 src/__pycache__/
 src/4 - Transformer/__pycache__/
 src/data/model/midi_transformer_1.tar
+src/data/model/
