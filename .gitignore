@@ -6,3 +6,6 @@ src/__pycache__/
 src/4 - Transformer/__pycache__/
 src/data/model/midi_transformer_1.tar
 src/data/model/
+src/data/midi/animal_crossing_continued.mid
+src/data/midi/animal_crossing_intro.mid
+src/data/midi/transformer_generated.mid
