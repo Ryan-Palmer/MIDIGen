@@ -33,7 +33,7 @@
 	// "features": {},
 
 	// Use 'forwardPorts' to make a list of ports inside the container available locally.
-	// "forwardPorts": [],
+	"forwardPorts": [ 6006 ],
 
 	// Uncomment the next line if you want start specific services in your Docker Compose config.
 	// "runServices": [],
@@ -42,7 +42,7 @@
 	// "shutdownAction": "none",
 
 	// Uncomment the next line to run commands after the container is created.
-	// "postCreateCommand": ""
+	"postCreateCommand": "tensorboard --logdir=runs --bind_all"
 
 	// Configure tool-specific properties.
 	// "customizations": {},

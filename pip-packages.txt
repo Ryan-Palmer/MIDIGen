@@ -2,3 +2,4 @@ jupyterlab
 numpy
 music21
 matplotlib
+tb-nightly
