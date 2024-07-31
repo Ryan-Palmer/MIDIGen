@@ -42,7 +42,7 @@
 	// "shutdownAction": "none",
 
 	// Uncomment the next line to run commands after the container is created.
-	"postCreateCommand": "tensorboard --logdir=runs --bind_all"
+	"postCreateCommand": "tensorboard --logdir=tensorboard --bind_all"
 
 	// Configure tool-specific properties.
 	// "customizations": {},

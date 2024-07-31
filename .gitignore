@@ -1,13 +1,12 @@
 src/data/midi/vg/
-src/data/midi/vg_large/Ace Attorney_Nintendo 3DS_Phoenix Wright Ace Attorney Spirit of Justice_Cheerful People.mid
 src/data/midi/vg_large/
-src/data/numpy/
 src/__pycache__/
 src/4 - Transformer/__pycache__/
-src/data/model/midi_transformer_1.tar
+src/data/numpy/
 src/data/model/
+src/tensorboard/
 src/data/midi/animal_crossing_continued.mid
+src/data/midi/animal_crossing_continued_2.mid
 src/data/midi/animal_crossing_intro.mid
 src/data/midi/transformer_generated.mid
-src/data/midi/
-src/runs/
+src/data/midi/transformer_generated_long.mid
