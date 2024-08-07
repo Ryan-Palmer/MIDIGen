@@ -1,6 +1,6 @@
 # MIDIGen Next Note Prediction
 
-A Jupyter notebook exploring MIDI next-note prediction as a way of learning about topics such as tokenisation and transformer architectures.
+A series of Jupyter notebooks exploring MIDI next-note prediction as a way of learning about topics such as tokenisation and transformer architectures.
 
 It takes heavy inspiration from [MusicAutobot](https://github.com/bearpelican/musicautobot/tree/master).
 
