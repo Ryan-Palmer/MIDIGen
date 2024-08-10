@@ -24,7 +24,8 @@
 				"ms-python.python",
 				"ms-python.debugpy",
 				"esbenp.prettier-vscode",
-				"mechatroner.rainbow-csv"
+				"mechatroner.rainbow-csv",
+				"ms-toolsai.tensorboard"
 			]
 		}
 	},
@@ -33,7 +34,7 @@
 	// "features": {},
 
 	// Use 'forwardPorts' to make a list of ports inside the container available locally.
-	"forwardPorts": [ 6006 ],
+	// "forwardPorts": [],
 
 	// Uncomment the next line if you want start specific services in your Docker Compose config.
 	// "runServices": [],
@@ -42,7 +43,7 @@
 	// "shutdownAction": "none",
 
 	// Uncomment the next line to run commands after the container is created.
-	"postCreateCommand": "tensorboard --logdir=tensorboard --bind_all"
+	// "postCreateCommand": ""
 
 	// Configure tool-specific properties.
 	// "customizations": {},
