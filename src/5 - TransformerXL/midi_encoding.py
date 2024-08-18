@@ -39,11 +39,8 @@ class MusicVocab():
     def __init__(self):
         itos = SPECIAL_TOKENS + NOTE_TOKENS + DURATION_TOKENS
         # Ensure that the vocab is a multiple of 8 for fp16 training
-        print (f'Vocab length: {len(itos)}')
         if len(itos)%8 != 0:
-            print (f'Padding vocab {len(itos)%8}')
             itos = itos + [f'dummy{i}' for i in range(8 - len(itos)%8)]
-            print (f'Padded vocab length: {len(itos)}')
         self.itos = itos
         self.stoi = {v:k for k,v in enumerate(self.itos)}
 
