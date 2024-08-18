@@ -1,5 +1,7 @@
 jupyterlab
-numpy
+numpy == 1.26.4
 music21
 matplotlib
 tb-nightly
+einops
+faiss-gpu
