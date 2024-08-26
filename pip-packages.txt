@@ -4,4 +4,3 @@ music21
 matplotlib
 tb-nightly
 einops
-faiss-gpu
