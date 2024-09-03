@@ -4,7 +4,6 @@ src/__pycache__/
 src/4 - Transformer/__pycache__/
 src/data/numpy/
 src/data/model/
-src/tensorboard/
 src/data/midi/animal_crossing_continued.mid
 src/data/midi/animal_crossing_continued_2.mid
 src/data/midi/animal_crossing_intro.mid
