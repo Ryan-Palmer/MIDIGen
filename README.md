@@ -2,7 +2,7 @@
 
 A series of Jupyter notebooks exploring MIDI next-note prediction as a way of learning about topics such as tokenisation and transformer architectures.
 
-It takes heavy inspiration from [MusicAutobot](https://github.com/bearpelican/musicautobot/tree/master).
+It takes heavy inspiration from Andrew Shaw's [MusicAutobot](https://github.com/bearpelican/musicautobot/tree/master) project, Andrej Karpathy's [Zero to Hero](https://www.youtube.com/playlist?list=PLAqhIrjkxbuWI23v9cThsA9GvCAUhRvKZ) series and Nick Ryan's [Coding a Paper](https://www.youtube.com/playlist?list=PLam9sigHPGwOe8VDoS_6VT4jjlgs9Uepb) series.
 
 It is set up as a dev container so the whole environment can be launched with a single command and connected to using VSCode (or through the browser).
 
