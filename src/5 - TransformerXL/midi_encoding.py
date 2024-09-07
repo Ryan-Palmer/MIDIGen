@@ -196,7 +196,11 @@ def timestep_to_position_enc_no_tidx(timestep, note_range=MIDI_NOTE_RANGE):
 def position_to_idx_enc(note_position_score, vocab):
     nps = note_position_score.copy()
     note_idx_score = nps[:, :2] # Note and duration
+
+    # TODO IMPORTANT - The strategy of making a pos score by doubling up the position for note and duration won't work if we byte pair encode, as tokens will get merged.
+    # We would have to let the vocab intelligently encode the whole nps.
     pos_score = np.repeat(nps[:, 2], 2) # Double up positions for note and duration
+    
     note_min_idx, _ = vocab.note_range
     dur_min_idx, _ = vocab.duration_range
     
@@ -205,12 +209,16 @@ def position_to_idx_enc(note_position_score, vocab):
     # Using broadcasting to add the 1D [note_min_idx, dur_min_idx] to the 2D note_idx_score.
     note_idx_score += np.array([note_min_idx, dur_min_idx])
 
-    #TODO Rather than do a hard offset for note and duration, pass the whole position score to Vocab and let it byte pair encode
+    # TODO Rather than do a hard offset for note and duration, pass the whole position score to Vocab and let it byte pair encode
     # e.g.
-    # note_dur_score = nps[:, :2]
-    # note_idx_score = vocab.encode(note_dur_score)
+    # note_idx_score = vocab.encode(nps)
     # I would have to train the vocab object up front to know the most common pairs across the dataset, not just this song.
     # The trained vocab data would have to be saved and loaded with the encoded scores, otherwise you couldn't decode them.
+    # vocab aroumd 12k for gpt 2. Increases size of input embedding layer and output softmax layer.
+    # Too large vocab also means compressing lots of info into a single token, and they come up less often.
+    # Question: Should we consider SEPARATOR_IDX as a hard terminator of bpe (like a word space) and pre-chunk into simultaneous 'actions'?
+    # Instead of 'optional space followed by a sequence of chars' it would be 'optional separator followed by an action (sequence of notes and durations)'
+    # Answer: No need because an 'action' is *always* followed by a separator, it's not like we have a range of punctuation to differentiate (i.e. dog. vs dog, vs dog!).
 
     prefix =  np.array([vocab.sos_idx])
     prefix_position = np.array([pos_score[0]])
