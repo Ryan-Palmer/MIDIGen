@@ -36,7 +36,7 @@ TIMESIG = f'{BEATS_PER_MEASURE}/4'
 
 class MusicVocab():
     def __init__(self):
-        itos = SPECIAL_TOKENS + NOTE_TOKENS + DURATION_TOKENS
+        itos = ALL_TOKENS
         # Ensure that the vocab is a multiple of 8 for fp16 training
         print (f'Vocab length: {len(itos)}')
         if len(itos)%8 != 0:
