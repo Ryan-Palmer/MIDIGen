@@ -205,6 +205,13 @@ def position_to_idx_enc(note_position_score, vocab):
     # Using broadcasting to add the 1D [note_min_idx, dur_min_idx] to the 2D note_idx_score.
     note_idx_score += np.array([note_min_idx, dur_min_idx])
 
+    #TODO Rather than do a hard offset for note and duration, pass the whole position score to Vocab and let it byte pair encode
+    # e.g.
+    # note_dur_score = nps[:, :2]
+    # note_idx_score = vocab.encode(note_dur_score)
+    # I would have to train the vocab object up front to know the most common pairs across the dataset, not just this song.
+    # The trained vocab data would have to be saved and loaded with the encoded scores, otherwise you couldn't decode them.
+
     prefix =  np.array([vocab.sos_idx])
     prefix_position = np.array([pos_score[0]])
 
