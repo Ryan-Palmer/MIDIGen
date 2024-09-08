@@ -212,13 +212,6 @@ def position_to_idx_enc(note_position_score, vocab):
     # TODO Rather than do a hard offset for note and duration, pass the whole position score to Vocab and let it byte pair encode
     # e.g.
     # note_idx_score = vocab.encode(nps)
-    # I would have to train the vocab object up front to know the most common pairs across the dataset, not just this song.
-    # The trained vocab data would have to be saved and loaded with the encoded scores, otherwise you couldn't decode them.
-    # vocab aroumd 12k for gpt 2. Increases size of input embedding layer and output softmax layer.
-    # Too large vocab also means compressing lots of info into a single token, and they come up less often.
-    # Question: Should we consider SEPARATOR_IDX as a hard terminator of bpe (like a word space) and pre-chunk into simultaneous 'actions'?
-    # Instead of 'optional space followed by a sequence of chars' it would be 'optional separator followed by an action (sequence of notes and durations)'
-    # Answer: No need because an 'action' is *always* followed by a separator, it's not like we have a range of punctuation to differentiate (i.e. dog. vs dog, vs dog!).
 
     prefix =  np.array([vocab.sos_idx])
     prefix_position = np.array([pos_score[0]])
@@ -363,6 +356,9 @@ def idx_to_position_enc(idx_score, vocab):
     if notes_durations_idx_score.shape[0] % 2 != 0:
         notes_durations_idx_score = notes_durations_idx_score[:-1]
 
+    # TODO Rather than do a hard offset for note and duration, pass the whole position score to Vocab and let it byte pair encode
+    # e.g.
+    # position_score = vocab.decode(notes_durations_idx_score)   
     position_score = notes_durations_idx_score.copy().reshape(-1, 2)
     
     # Shift token index values to note and duration values
