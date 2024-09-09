@@ -30,7 +30,7 @@ class MidiDataset(Dataset):
                 idx_score = np.load(encoded_file_path, allow_pickle=True)
             else:
                 # print(f'Processing {midi_file_path}')
-                idx_score = midifile_to_idx_score(midi_file_path, vocab, True)
+                idx_score = midifile_to_idx_score(midi_file_path, vocab)
                 if (idx_score is None): # Skip files that could not be processed
                     # print(f'Could not process {midi_file_path}')
                     continue

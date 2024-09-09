@@ -115,49 +115,6 @@ def timestep_to_position_enc(timestep, tidx, note_range=MIDI_NOTE_RANGE):
     # MusicAutobot allows different encoding schemes which include instrument number and split pitch into class / octave.
     return [n[:3] for n in sorted_notes]
 
-# Pass in the 'one-hot' encoded numpy score
-def sparse_to_position_enc_no_tidx(sparse_score, skip_last_rest=True):
-
-    def encode_timestep(acc, timestep):
-        encoded_timesteps, wait_count = acc
-        encoded_timestep = timestep_to_position_enc_no_tidx(timestep) # pass in all notes for both instruments, merged list returned
-        if len(encoded_timestep) == 0: # i.e. all zeroes at time step
-            wait_count += 1
-        else:
-            if wait_count > 0:
-                encoded_timesteps.append([SEPARATOR_IDX, wait_count]) # add rests
-            encoded_timesteps.extend(encoded_timestep)
-            wait_count = 1
-        
-        return encoded_timesteps, wait_count
-    
-    # encoded_timesteps is an array of [ pitch, duration, position ]
-    encoded_timesteps, final_wait_count = reduce(encode_timestep, sparse_score, ([], 0))
-
-    if final_wait_count > 0 and not skip_last_rest:
-        encoded_timesteps.append([SEPARATOR_IDX, final_wait_count]) # add trailing rests
-
-    return np.array(encoded_timesteps).reshape(-1, 2) # reshaping. Just in case result is empty
-    
-def timestep_to_position_enc_no_tidx(timestep, note_range=MIDI_NOTE_RANGE):
-
-    note_min, note_max = note_range
-
-    def encode_note_data(note_data, active_note_idx):
-        instrument, pitch = active_note_idx
-        duration = timestep[instrument, pitch]
-        if pitch >= note_min and pitch < note_max:
-            note_data.append([pitch, duration, instrument])
-        return note_data
-    
-    active_note_idxs = zip(*timestep.nonzero())
-    encoded_notes = reduce(encode_note_data, active_note_idxs, [])
-    sorted_notes = sorted(encoded_notes, key=lambda x: x[0], reverse=True) # sort by note (highest to lowest)
-
-    # Dropping instrument information for simplicity.
-    # MusicAutobot allows different encoding schemes which include instrument number and split pitch into class / octave.
-    return [n[:2] for n in sorted_notes]
-
 def position_to_idx_enc(note_position_score, vocab):
     nps = note_position_score.copy()
     note_idx_score = nps[:, :2] # Note and duration
@@ -190,22 +147,6 @@ def position_to_idx_enc(note_position_score, vocab):
     # Returning note and positions in stacked array as we want to embed them separately in the model
     return np.stack([note_idx_score, pos_score], axis=1)
 
-def position_to_idx_enc_no_tidx(note_position_score, vocab):
-    nps = note_position_score.copy()
-    note_idx_score = nps[:, :2] # Note and duration
-    note_min_idx, _ = vocab.note_range
-    dur_min_idx, _ = vocab.duration_range
-    
-    # Replace note and duration tokens with their index in vocab. 
-    # Tokens are the same order as notes and note_min_idx offset is constant so we can apply in one go.
-    # Using broadcasting to add the 1D [note_min_idx, dur_min_idx] to the 2D note_idx_score.
-    note_idx_score += np.array([note_min_idx, dur_min_idx])
-
-    prefix =  np.array([vocab.sos_idx])
-    suffix = np.array([vocab.eos_idx])
-
-    return np.concatenate([prefix, note_idx_score.reshape(-1), suffix])
-
 def import_midi_file(file_path):
     midifile = m21.midi.MidiFile()
     if isinstance(file_path, bytes):
@@ -219,17 +160,13 @@ def import_midi_file(file_path):
 def midifile_to_stream(midifile): 
     return m21.midi.translate.midiFileToStream(midifile)
 
-def midifile_to_idx_score(file_path, vocab, time_encode=True):
+def midifile_to_idx_score(file_path, vocab):
     midifile = import_midi_file(file_path)
     stream = midifile_to_stream(midifile)
     if stream.getTimeSignatures()[0].ratioString == '4/4':
         sparse_score = stream_to_sparse_enc(stream)
-        if time_encode:
-            note_pos_score = sparse_to_position_enc(sparse_score)
-            return position_to_idx_enc(note_pos_score, vocab)
-        else:
-            note_pos_score = sparse_to_position_enc_no_tidx(sparse_score)
-            return position_to_idx_enc_no_tidx(note_pos_score, vocab)
+        note_pos_score = sparse_to_position_enc(sparse_score)
+        return position_to_idx_enc(note_pos_score, vocab)
     else:
         return None
 
