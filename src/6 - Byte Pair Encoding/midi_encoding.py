@@ -133,7 +133,7 @@ def position_to_idx_enc(note_position_score, vocab):
 
     # TODO Rather than do a hard offset for note and duration, pass the whole position score to Vocab and let it byte pair encode
     # e.g.
-    # note_idx_score = vocab.encode(nps)
+    # note_idx_score, pos_score = vocab.encode(nps)
 
     prefix =  np.array([vocab.sos_idx])
     prefix_position = np.array([pos_score[0]])
