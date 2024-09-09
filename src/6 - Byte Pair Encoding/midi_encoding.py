@@ -116,24 +116,7 @@ def timestep_to_position_enc(timestep, tidx, note_range=MIDI_NOTE_RANGE):
     return [n[:3] for n in sorted_notes]
 
 def position_to_idx_enc(note_position_score, vocab):
-    nps = note_position_score.copy()
-    note_idx_score = nps[:, :2] # Note and duration
-
-    # TODO IMPORTANT - The strategy of making a pos score by doubling up the position for note and duration won't work if we byte pair encode, as tokens will get merged.
-    # We would have to let the vocab intelligently encode the whole nps.
-    pos_score = np.repeat(nps[:, 2], 2) # Double up positions for note and duration
-    
-    note_min_idx, _ = vocab.note_range
-    dur_min_idx, _ = vocab.duration_range
-    
-    # Replace note and duration tokens with their index in vocab. 
-    # Tokens are the same order as notes and note_min_idx offset is constant so we can apply in one go.
-    # Using broadcasting to add the 1D [note_min_idx, dur_min_idx] to the 2D note_idx_score.
-    note_idx_score += np.array([note_min_idx, dur_min_idx])
-
-    # TODO Rather than do a hard offset for note and duration, pass the whole position score to Vocab and let it byte pair encode
-    # e.g.
-    # note_idx_score, pos_score = vocab.encode(nps)
+    note_idx_score, pos_score = vocab.encode(note_position_score)
 
     prefix =  np.array([vocab.sos_idx])
     prefix_position = np.array([pos_score[0]])
@@ -249,28 +232,10 @@ def position_to_sparse_enc(note_position_score):
 
 # No validation of note position encoding included to keep it simple for now
 def idx_to_position_enc(idx_score, vocab):
-    
-    # Filter out special tokens
+    # Filter out special tokens, convert idxs to positions and pair up note / durations
     notes_durs_start, notes_durs_end = vocab.note_position_enc_range # range of non-special token values
     notes_durations_idx_score = idx_score[np.where((idx_score >= notes_durs_start) & (idx_score < notes_durs_end))]
-
-    # Reshape into pairs of (note, duration). If odd number of tokens, discard the last token.
-    if notes_durations_idx_score.shape[0] % 2 != 0:
-        notes_durations_idx_score = notes_durations_idx_score[:-1]
-
-    # TODO Rather than do a hard offset for note and duration, pass the whole position score to Vocab and let it byte pair encode
-    # e.g.
-    # position_score = vocab.decode(notes_durations_idx_score)   
-    position_score = notes_durations_idx_score.copy().reshape(-1, 2)
-    
-    # Shift token index values to note and duration values
-    if position_score.shape[0] == 0: 
-        return position_score
-    else:
-        note_min_idx, _ = vocab.note_range
-        dur_min_idx, _ = vocab.duration_range
-        position_score -= np.array([note_min_idx, dur_min_idx])
-        return position_score
+    return vocab.decode(notes_durations_idx_score).reshape(-1, 2)
 
 def idx_to_stream_enc(idx_score, vocab):
     position_score = idx_to_position_enc(idx_score, vocab)
