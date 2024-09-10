@@ -417,8 +417,8 @@ class DecoderTransformer_KNN_XL(torch.nn.Module):
         self.max_bar_position = max_bar_position
         self.current_file_idxs = None
         self.token_embedding = torch.nn.Embedding(self.vocab.size, n_embed)
-        self.rel_pos = XLRelativePosition(n_buckets = n_rel_pos_buckets, max_distance = rel_pos_max_distance, n_head = n_head, scaling_factor = scaling_factor)
-        self.rel_pos_knn = XLRelativePosition(n_buckets = n_rel_pos_buckets, max_distance = rel_pos_max_distance, n_head = n_head, scaling_factor = scaling_factor)
+        self.rel_pos = XLRelativePosition(n_buckets = n_rel_pos_buckets, max_distance = rel_pos_max_distance, n_head = n_head, scaling_factor = scaling_factor, device = device)
+        self.rel_pos_knn = XLRelativePosition(n_buckets = n_rel_pos_buckets, max_distance = rel_pos_max_distance, n_head = n_head, scaling_factor = scaling_factor, device = device)
         self.beat_embedding = torch.nn.Embedding(SAMPLES_PER_BAR, n_embed)
         self.bar_embedding = torch.nn.Embedding(max_bar_position, n_embed)
         
