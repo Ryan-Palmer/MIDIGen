@@ -72,17 +72,19 @@ class XLRelativePosition(torch.nn.Module):
       n_buckets,
       max_distance,
       n_head,
-      scaling_factor):
+      scaling_factor,
+      device):
     
     super().__init__()
     self.scale = scaling_factor
     self.num_buckets = n_buckets
     self.max_distance = max_distance
+    self.device = device
     self.relative_attention_embedding = torch.nn.Embedding(n_buckets, n_head)
 
   def relative_position_bucket(self, relative_position_matrix):
     inv_rel_pos = -relative_position_matrix
-    masked_rel_pos = torch.max(inv_rel_pos, torch.zeros_like(inv_rel_pos, device=device))
+    masked_rel_pos = torch.max(inv_rel_pos, torch.zeros_like(inv_rel_pos, device=self.device))
 
     max_exact = self.num_buckets // 2
 
@@ -90,13 +92,13 @@ class XLRelativePosition(torch.nn.Module):
     val_if_large = max_exact + (torch.log(masked_rel_pos.float() / max_exact) / math.log(self.max_distance / max_exact) * (self.num_buckets - max_exact)).long()
 
     # Clip the values to the number of buckets - 1
-    val_if_large = torch.min(val_if_large, torch.full_like(val_if_large, self.num_buckets - 1, device=device))
+    val_if_large = torch.min(val_if_large, torch.full_like(val_if_large, self.num_buckets - 1, device=self.device))
 
     return torch.where(is_small, masked_rel_pos, val_if_large)
 
   def forward(self, block_size):
-    block_pos = torch.arange(block_size, dtype=torch.long, device=device)
-    context_pos = torch.arange(-block_size, block_size, dtype=torch.long, device=device) # XL memory, context is twice block size, and current position starts in the middle.
+    block_pos = torch.arange(block_size, dtype=torch.long, device=self.device)
+    context_pos = torch.arange(-block_size, block_size, dtype=torch.long, device=self.device) # XL memory, context is twice block size, and current position starts in the middle.
     block_rel_pos = rearrange(block_pos, 'i -> i 1')
     context_rel_pos = rearrange(context_pos, 'j -> 1 j')
     rel_pos = context_rel_pos - block_rel_pos
@@ -110,11 +112,12 @@ class XLRelativePosition(torch.nn.Module):
   
 class XLAttention(torch.nn.Module):
 
-    def __init__(self, n_embed, n_head, dropout):
+    def __init__(self, n_embed, n_head, dropout, device):
         super().__init__()
         self.n_embed = n_embed
         self.n_head = n_head
         self.head_size = n_embed // n_head
+        self.device = device
         head_total_size = n_head * self.head_size
         self.key = torch.nn.Linear(n_embed, head_total_size, bias=False)
         self.query = torch.nn.Linear(n_embed, head_total_size, bias=False)
@@ -175,7 +178,7 @@ class XLAttention(torch.nn.Module):
     
 class KNN_XLAttention(torch.nn.Module):
 
-    def __init__(self, db_filepath, sample_length, max_file_length, top_k, n_embed, n_head, dropout):
+    def __init__(self, sample_length, max_file_length, top_k, n_embed, n_head, dropout, device):
         super().__init__()
         self.n_embed = n_embed
         self.top_k = top_k
@@ -187,7 +190,7 @@ class KNN_XLAttention(torch.nn.Module):
         self.value = torch.nn.Linear(n_embed, n_embed, bias=False)
         self.project = torch.nn.Linear(n_embed, n_embed)
         self.dropout = torch.nn.Dropout(dropout)
-        self.db_filepath = db_filepath
+        self.device = device
 
         # Memory per batch dim, e.g. 32 sequences at 256 per sequence is 8192 memories per batch dim.
         self.max_memories = max_file_length * sample_length
@@ -209,7 +212,7 @@ class KNN_XLAttention(torch.nn.Module):
         B, T, C = x.shape
 
         if self.knn is None:
-            self.knn = {i: KNN(dim=self.n_embed, max_memories=self.max_memories, db_filepath=Path(f'{self.db_filepath}/batch_dim-{i}.db')) for i in range(B)}
+            self.knn = {i: KNN(dim=self.n_embed, max_memories=self.max_memories, device=self.device) for i in range(B)}
 
         # Clear batch dim's knn memory if file changes
         if self.current_file_idxs != None:
@@ -247,7 +250,7 @@ class KNN_XLAttention(torch.nn.Module):
         w = w + relative_positions[..., -i:, -j:]
         w = w * self.scale_factor
 
-        mask = torch.ones((i,j), dtype = torch.bool, device=device).triu(j-i+1) # Can't cache this as its shape depends on whether we have XL memory or not.
+        mask = torch.ones((i,j), dtype = torch.bool, device=self.device).triu(j-i+1) # Can't cache this as its shape depends on whether we have XL memory or not.
         w = w.masked_fill(mask, float('-inf'))
         
         self.dropout(w)
@@ -256,7 +259,7 @@ class KNN_XLAttention(torch.nn.Module):
         weighted_values = w@v # b h t d
 
         ### KNN ATTENTION
-        knn_mask = torch.tensor([self.knn[i].index.ntotal >= self.top_k for i in range(B)], dtype=torch.bool, device=device)
+        knn_mask = torch.tensor([self.knn[i].index.ntotal >= self.top_k for i in range(B)], dtype=torch.bool, device=self.device)
 
         # Only do knn if there are at least some memories
         if knn_mask.any():
@@ -343,12 +346,13 @@ class FeedForward(torch.nn.Module):
     
 class Block(torch.nn.Module):
 
-    def __init__(self, n_embed, n_head, dropout):
+    def __init__(self, n_embed, n_head, dropout, device):
         super().__init__()
         self.attention = XLAttention(
-                            n_embed,
-                            n_head,
-                            dropout)
+                            n_embed = n_embed,
+                            n_head = n_head,
+                            dropout = dropout, 
+                            device = device)
         self.ff = FeedForward(n_embed, dropout)
         self.layer_norm1 = torch.nn.LayerNorm(n_embed)
         self.layer_norm2 = torch.nn.LayerNorm(n_embed)
@@ -362,16 +366,16 @@ class Block(torch.nn.Module):
     
 class KNNBlock(torch.nn.Module):
 
-    def __init__(self, db_filepath, sample_length, max_file_length, n_embed, n_head, top_k, dropout):
+    def __init__(self, sample_length, max_file_length, n_embed, n_head, top_k, dropout, device):
         super().__init__()
         self.attention = KNN_XLAttention(
-                            db_filepath,
-                            sample_length, 
-                            max_file_length,
-                            top_k,
-                            n_embed,
-                            n_head,
-                            dropout)
+                            sample_length = sample_length, 
+                            max_file_length = max_file_length,
+                            top_k= top_k,
+                            n_embed = n_embed,
+                            n_head = n_head,
+                            dropout = dropout,
+                            device = device)
         self.ff = FeedForward(n_embed, dropout)
         self.layer_norm1 = torch.nn.LayerNorm(n_embed)
         self.layer_norm2 = torch.nn.LayerNorm(n_embed)
@@ -387,7 +391,6 @@ class DecoderTransformer_KNN_XL(torch.nn.Module):
 
     def __init__(
             self,
-            db_filepath,
             vocab,
             sample_length,
             max_file_length,
@@ -423,9 +426,9 @@ class DecoderTransformer_KNN_XL(torch.nn.Module):
         for i in range(n_layer): # 0 -> (n_layer - 1)
 
             if self.isKNNLayer(i):
-                self.blocks.append(KNNBlock(db_filepath=db_filepath, sample_length=sample_length, max_file_length=max_file_length, n_embed=n_embed, n_head=n_head, top_k=top_k, dropout=dropout))
+                self.blocks.append(KNNBlock(sample_length=sample_length, max_file_length=max_file_length, n_embed=n_embed, n_head=n_head, top_k=top_k, dropout=dropout, device=device))
             else:
-                self.blocks.append(Block(n_embed=n_embed, n_head=n_head, dropout=dropout))
+                self.blocks.append(Block(n_embed=n_embed, n_head=n_head, dropout=dropout, device=device))
             
         self.layer_norm = torch.nn.LayerNorm(n_embed)
         self.lm_head = torch.nn.Linear(n_embed, self.vocab.size)
