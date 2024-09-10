@@ -232,10 +232,14 @@ def position_to_sparse_enc(note_position_score):
 
 # No validation of note position encoding included to keep it simple for now
 def idx_to_position_enc(idx_score, vocab):
-    # Filter out special tokens, convert idxs to positions and pair up note / durations
+    # Filter out special tokens
     notes_durs_start, notes_durs_end = vocab.note_position_enc_range # range of non-special token values
     notes_durations_idx_score = idx_score[np.where((idx_score >= notes_durs_start) & (idx_score < notes_durs_end))]
-    return vocab.decode(notes_durations_idx_score).reshape(-1, 2)
+    
+    if notes_durations_idx_score.shape[0] % 2 != 0:
+        notes_durations_idx_score = notes_durations_idx_score[:-1]
+
+    return vocab.decode(notes_durations_idx_score)
 
 def idx_to_stream_enc(idx_score, vocab):
     position_score = idx_to_position_enc(idx_score, vocab)
