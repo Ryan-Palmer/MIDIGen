@@ -153,7 +153,7 @@ class XLAttention(torch.nn.Module):
         w = w + relative_positions[..., -i:, -j:]
         w = w * (self.head_size ** -0.5)
         
-        mask = torch.ones((i,j), dtype = torch.bool, device=device).triu(j-i+1) # Can't cache this as its shape depends on whether we have XL memory or not.
+        mask = torch.ones((i,j), dtype = torch.bool, device=self.device).triu(j-i+1) # Can't cache this as its shape depends on whether we have XL memory or not.
         w = w.masked_fill(mask, float('-inf'))
 
         self.dropout(w)
