@@ -115,6 +115,14 @@ class MusicVocab():
             'merges': self.merges
         }
     
+    def save(self, path):
+        state_dict = self.state_dict()
+        torch.save(state_dict, path)
+
+    def load(self, path):
+        state_dict = torch.load(path)
+        self.load_state_dict(state_dict)
+    
     def load_state_dict(self, state_dict):
         self.merges = state_dict['merges']
         self.idx_to_elem = state_dict['idx_to_elem']
