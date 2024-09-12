@@ -63,23 +63,20 @@ class MusicVocab():
         i = 0
         while i < len(idxs):
             # Need to make sure we don't merge across time steps, otherwise we can't assign a tidx to the merged token
-            # Also, time steps are kind of our 'actions' or 'words', so it makes sense to make them a merge boundary
-
-            
-            # How about we force a jump of two and ignore special tokens? i.e. we only allow (note, dur) or (sep, dur) bottom level merges?
-            # The trouble is they wouldn't only be the bottom layer, we would end up doing every other merged token too
 
             current_item = idxs[i]
             next_item = idxs[i+1] if i < len(idxs) - 1 else None
 
-            is_timestep_spanning = i > 0 and idxs[i-1] == self.sep_idx
-            is_song_spanning = current_item == self.eos_idx or next_item == self.sos_idx
+            # This only works for the first merges. After that we will have a new token that represents (n1, SEP) so the last token was a sep but the check won't work
+            # This whole algo needs rethinking
+            # is_timestep_spanning = i > 0 and idxs[i-1] == self.sep_idx
+            # is_song_spanning = current_item == self.eos_idx or next_item == self.sos_idx
 
-            if pos is not None:
-                current_pos = pos[i]
-                new_pos.append(current_pos)
+            # if pos is not None:
+            #     current_pos = pos[i]
+            #     new_pos.append(current_pos)
 
-            if not is_song_spanning and not is_timestep_spanning and next_item is not None and current_item == pair[0] and next_item == pair[1]:
+            if next_item is not None and current_item == pair[0] and next_item == pair[1]:
                 new_idxs.append(idx)
                 i += 2
             else:
@@ -95,7 +92,7 @@ class MusicVocab():
                 grouped[time] = []
             grouped[time].append(value)
         
-        result = [[values, time] for time, values in grouped.items()]
+        result = [values for values in grouped.values()]
         return result
 
     # Pass in data already encoded using untrained vocab
@@ -108,7 +105,16 @@ class MusicVocab():
 
         # Might have to skip the clone, depending on memory usage
         idxs = torch.cat([t.flatten(0,1) for t in dataset.data.unbind()]) # Flatten the nested tensor
-        idxs = idxs[:, 0].detach().cpu().tolist() # Discard time idx and convert to list
+        idxs = idxs.detach().cpu().tolist() # Discard time idx and convert to list
+
+        # This is fine for training, it ensures the vocab makes sense as it has simultaneous actions as its smallest unit
+        # [[1, 0], [2, 0], [3, 0], [4, 1], [5, 1], [6, 2], [7, 2], [8, 2], [9, 2]]
+        # [[1, 2, 3], [4, 5], [6, 7, 8, 9]]
+        # More accurately it might be of the form # [[1, 2, 3], [4, 5], [6, 7, 8, 9], [1, 2, 3], [1, 2, 3], [6, 7, 8, 9], [4, 5], [4, 5], [4, 5]]
+        # How about we accept that we don't need to / can't byte pair encode because of timestep boundaries, but we can add single aggregated timestep tokens to the vocab
+        # To 'train', just group by timestep, count how many of each action there are and the most common n actions become the new tokens
+        # {[1,2,3] : 3, [4,5] : 4, [6,7,8,9] : 2}
+        # Desired new tokens = 2 means new tokens for [4,5] and [1,2,3] but not [6,7,8,9]
         idxs = self.group_by_timestep(idxs)
 
         initial_size = self.size
@@ -149,7 +155,12 @@ class MusicVocab():
         self.stoi = {v:k for k,v in enumerate(self.itos.values())}
     
     def encode(self, note_position_score):
+        
+        # Would have to group by timestep here so the pairs are the same as the vocab
+        # Could optionally return as [[[1, 2, 3], 0], [[4, 5], 1], [[6, 7, 8, 9], 2]] rather than dropping the timestep but could just as easilt use range(len(nps)) as tidx
+        # More accurately it might be of the form # [[1, 2, 3], [4, 5], [6, 7, 8, 9], [1, 2, 3], [1, 2, 3], [6, 7, 8, 9], [4, 5]]
         nps = note_position_score.copy()
+        
         note_dur_score = nps[:, :2] # Note and duration, drop tidx
         
         # Offset the note and duration values by the min index to get their index
@@ -160,10 +171,15 @@ class MusicVocab():
         note_idx_score = note_idx_score.reshape(-1) # Flatten note and duration into a single dimension
         pos_score = np.repeat(nps[:, 2], 2) # Double up positions for flattened note and duration
         
+
+        # Given the suggested vocab doesn't have merges, we could just chunk by timestep, find and replace, then unchunk. **** <---------
+        # Following the example above where our vocab ended up as [[4, 5], [1, 2, 3]] we would replace all instances of those pairs with the respective new token, keeping the timestep, before unchunking
+
         while True:
+
             stats = self.get_stats(note_idx_score)
 
-            # Iterate keys and get the pair with the min number of merges, so we do earlier merges first
+            # Iterate keys and get the pair with the min key that exists in merges so we do earlier merges first
             pair = min(stats, key=lambda p: self.merges.get(p, float('inf')))
             
             if pair not in self.merges:
