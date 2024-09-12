@@ -63,16 +63,23 @@ class MusicVocab():
         i = 0
         while i < len(idxs):
             # Need to make sure we don't merge across time steps, otherwise we can't assign a tidx to the merged token
+            # Also, time steps are kind of our 'actions' or 'words', so it makes sense to make them a merge boundary
+
+            
+            # How about we force a jump of two and ignore special tokens? i.e. we only allow (note, dur) or (sep, dur) bottom level merges?
+            # The trouble is they wouldn't only be the bottom layer, we would end up doing every other merged token too
+
             current_item = idxs[i]
+            next_item = idxs[i+1] if i < len(idxs) - 1 else None
+
+            is_timestep_spanning = i > 0 and idxs[i-1] == self.sep_idx
+            is_song_spanning = current_item == self.eos_idx or next_item == self.sos_idx
 
             if pos is not None:
                 current_pos = pos[i]
                 new_pos.append(current_pos)
 
-            is_timestep_spanning = i > 0 and idxs[i-1] == self.sep_idx
-            next_item = idxs[i+1] if i < len(idxs) - 1 else None
-
-            if not is_timestep_spanning and next_item is not None and current_item == pair[0] and next_item == pair[1]:
+            if not is_song_spanning and not is_timestep_spanning and next_item is not None and current_item == pair[0] and next_item == pair[1]:
                 new_idxs.append(idx)
                 i += 2
             else:
@@ -80,6 +87,16 @@ class MusicVocab():
                 i += 1
 
         return new_idxs, new_pos
+
+    def group_by_timestep(self, data):
+        grouped = {}
+        for value, time in data:
+            if time not in grouped:
+                grouped[time] = []
+            grouped[time].append(value)
+        
+        result = [[values, time] for time, values in grouped.items()]
+        return result
 
     # Pass in data already encoded using untrained vocab
     def train(self, dataset, max_vocab_size):
@@ -92,6 +109,8 @@ class MusicVocab():
         # Might have to skip the clone, depending on memory usage
         idxs = torch.cat([t.flatten(0,1) for t in dataset.data.unbind()]) # Flatten the nested tensor
         idxs = idxs[:, 0].detach().cpu().tolist() # Discard time idx and convert to list
+        idxs = self.group_by_timestep(idxs)
+
         initial_size = self.size
         num_merges = max_vocab_size - initial_size
 
