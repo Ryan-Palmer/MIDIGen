@@ -39,7 +39,7 @@ class MusicVocab():
         self.itos = {k:v for k,v in enumerate(ALL_TOKENS)}
         self.stoi = {v:k for k,v in enumerate(ALL_TOKENS)}
         self.idx_to_elem = {k:[k] for k,v in enumerate(ALL_TOKENS)} # 1 is [1], 2 is [2] etc. until we merge.
-        self.merges = None
+        self.actions = None
     
     def to_indices(self, tokens):
         return [self.stoi[w] for w in tokens]
@@ -57,34 +57,8 @@ class MusicVocab():
             stats[pair] = stats.get(pair, 0) + 1
         return stats
 
-    def merge(self, idxs, pos, pair, idx):
-        new_idxs = []
-        new_pos = None if pos is None else []
-        i = 0
-        while i < len(idxs):
-            # Need to make sure we don't merge across time steps, otherwise we can't assign a tidx to the merged token
-
-            current_item = idxs[i]
-            next_item = idxs[i+1] if i < len(idxs) - 1 else None
-
-            # This only works for the first merges. After that we will have a new token that represents (n1, SEP) so the last token was a sep but the check won't work
-            # This whole algo needs rethinking
-            # is_timestep_spanning = i > 0 and idxs[i-1] == self.sep_idx
-            # is_song_spanning = current_item == self.eos_idx or next_item == self.sos_idx
-
-            # if pos is not None:
-            #     current_pos = pos[i]
-            #     new_pos.append(current_pos)
-
-            if next_item is not None and current_item == pair[0] and next_item == pair[1]:
-                new_idxs.append(idx)
-                i += 2
-            else:
-                new_idxs.append(current_item)
-                i += 1
-
-        return new_idxs, new_pos
-
+    # [[1, 0], [2, 0], [3, 0], [4, 1], [5, 1], [6, 2], [7, 2], [8, 2], [9, 2]]
+    # [[1, 2, 3], [4, 5], [6, 7, 8, 9]]
     def group_by_timestep(self, data):
         grouped = {}
         for value, time in data:
@@ -92,47 +66,46 @@ class MusicVocab():
                 grouped[time] = []
             grouped[time].append(value)
         
-        result = [values for values in grouped.values()]
+        result = [tuple(values) for values in grouped.values()]
         return result
 
     # Pass in data already encoded using untrained vocab
     def train(self, dataset, max_vocab_size):
 
-        if self.merges is not None:
+        # We can't byte pair encode because of timestep boundaries, but we can add single aggregated timestep tokens to the vocab
+        # To 'train', just group by timestep, count how many of each action group there are and the most common n become the new tokens
+
+        if self.actions is not None:
             raise Exception("Already trained")
         
-        self.merges = {}
-
-        # Might have to skip the clone, depending on memory usage
-        idxs = torch.cat([t.flatten(0,1) for t in dataset.data.unbind()]) # Flatten the nested tensor
-        idxs = idxs.detach().cpu().tolist() # Discard time idx and convert to list
-
-        # This is fine for training, it ensures the vocab makes sense as it has simultaneous actions as its smallest unit
-        # [[1, 0], [2, 0], [3, 0], [4, 1], [5, 1], [6, 2], [7, 2], [8, 2], [9, 2]]
-        # [[1, 2, 3], [4, 5], [6, 7, 8, 9]]
-        # More accurately it might be of the form # [[1, 2, 3], [4, 5], [6, 7, 8, 9], [1, 2, 3], [1, 2, 3], [6, 7, 8, 9], [4, 5], [4, 5], [4, 5]]
-        # How about we accept that we don't need to / can't byte pair encode because of timestep boundaries, but we can add single aggregated timestep tokens to the vocab
-        # To 'train', just group by timestep, count how many of each action there are and the most common n actions become the new tokens
         # {[1,2,3] : 3, [4,5] : 4, [6,7,8,9] : 2}
-        # Desired new tokens = 2 means new tokens for [4,5] and [1,2,3] but not [6,7,8,9]
-        idxs = self.group_by_timestep(idxs)
+        found_actions = {}
+
+        idxs = torch.cat([t.flatten(0,1) for t in dataset.data.unbind()]) # Flatten the nested tensor
+        idxs = idxs.detach().cpu().tolist()
+
+        # Of the form # [[1, 2, 3], [4, 5], [6, 7, 8, 9], [1, 2, 3], [1, 2, 3], [6, 7, 8, 9], [4, 5], [4, 5], [4, 5]]
+        grouped_idxs = self.group_by_timestep(idxs)
+
+        # Count how many of each action group there are
+        for action in grouped_idxs:
+            found_actions[action] = found_actions.get(action, 0) + 1
 
         initial_size = self.size
-        num_merges = max_vocab_size - initial_size
+        num_actions = max_vocab_size - initial_size
 
-        for i in range(num_merges):
-            stats = self.get_stats(idxs)
-            pair = max(stats, key=stats.get)
-            idx = initial_size + i
-            print(f"Merging {pair} to a new token {idx}")
-            idxs, _ = self.merge(idxs, None, pair, idx)
-            self.merges[pair] = idx
+        # Sort actions number of occurences and take the top num_actions keys
+        # {(4, 5): 4, (1, 2, 3): 3, (6, 7, 8, 9): 2}
+        sorted_actions = {k: v for k, v in sorted(found_actions.items(), key=lambda item: item[1], reverse=True)}
+
+        # [[4, 5], [1, 2, 3]] if num_actions is 2
+        self.actions = [list(key) for key in sorted_actions.keys()][:num_actions]
         
-        for (p0, p1), idx in self.merges.items():
-            value = f"{self.itos[p0]} {self.itos[p1]}"
+        for idx, action in enumerate(self.actions):
+            value = ' '.join([self.itos(a) for a in action])
             self.itos[idx] = value
             self.stoi[value] = idx
-            self.idx_to_elem[idx] = self.idx_to_elem[p0] + self.idx_to_elem[p1]
+            self.idx_to_elem[idx] = action
     
     def state_dict(self):
         return {
