@@ -39,6 +39,7 @@ class MusicVocab():
         self.itos = {k:v for k,v in enumerate(ALL_TOKENS)}
         self.stoi = {v:k for k,v in enumerate(ALL_TOKENS)}
         self.idx_to_elem = {k:[k] for k,v in enumerate(ALL_TOKENS)} # 1 is [1], 2 is [2] etc. until we merge.
+        self.initial_size = len(self.itos)
         self.actions = None
     
     def to_indices(self, tokens):
@@ -51,14 +52,8 @@ class MusicVocab():
     def to_element(self, idxs):
         return [self.idx_to_elem[idx] for idx in idxs]
 
-    def get_stats(self, idxs):
-        stats = {}
-        for pair in zip(idxs[:-1], idxs[1:]):
-            stats[pair] = stats.get(pair, 0) + 1
-        return stats
-
     # [[1, 0], [2, 0], [3, 0], [4, 1], [5, 1], [6, 2], [7, 2], [8, 2], [9, 2]]
-    # [[1, 2, 3], [4, 5], [6, 7, 8, 9]]
+    # [(1, 2, 3), (4, 5), (6, 7, 8, 9)]
     def group_by_timestep(self, data):
         grouped = {}
         for value, time in data:
@@ -78,7 +73,7 @@ class MusicVocab():
         if self.actions is not None:
             raise Exception("Already trained")
         
-        # {[1,2,3] : 3, [4,5] : 4, [6,7,8,9] : 2}
+        # {(1,2,3) : 3, (4,5) : 4, (6,7,8,9) : 2}
         found_actions = {}
 
         idxs = torch.cat([t.flatten(0,1) for t in dataset.data.unbind()]) # Flatten the nested tensor
@@ -91,8 +86,7 @@ class MusicVocab():
         for action in grouped_idxs:
             found_actions[action] = found_actions.get(action, 0) + 1
 
-        initial_size = self.size
-        num_actions = max_vocab_size - initial_size
+        num_actions = max_vocab_size - self.initial_size
 
         # Sort actions number of occurences and take the top num_actions keys
         # {(4, 5): 4, (1, 2, 3): 3, (6, 7, 8, 9): 2}
@@ -102,8 +96,8 @@ class MusicVocab():
         self.actions = [list(key) for key in sorted_actions.keys()][:num_actions]
         
         for i, action in enumerate(self.actions):
-            idx = initial_size + i
-            value = ' '.join([self.itos(a) for a in action])
+            idx = self.initial_size + i
+            value = ' '.join([self.itos[a] for a in action])
             self.itos[idx] = value
             self.stoi[value] = idx
             self.idx_to_elem[idx] = action
@@ -111,7 +105,7 @@ class MusicVocab():
     def state_dict(self):
         return {
             'idx_to_elem': self.idx_to_elem,
-            'merges': self.merges
+            'actions': self.actions
         }
     
     def save(self, path):
@@ -123,16 +117,12 @@ class MusicVocab():
         self.load_state_dict(state_dict)
     
     def load_state_dict(self, state_dict):
-        self.merges = state_dict['merges']
+        self.actions = state_dict['actions']
         self.idx_to_elem = state_dict['idx_to_elem']
         self.itos = {k:self.to_tokens(v) for k,v in enumerate(self.idx_to_elem.values())}
         self.stoi = {v:k for k,v in enumerate(self.itos.values())}
     
     def encode(self, note_position_score):
-        
-        # Would have to group by timestep here so the pairs are the same as the vocab
-        # Could optionally return as [[[1, 2, 3], 0], [[4, 5], 1], [[6, 7, 8, 9], 2]] rather than dropping the timestep but could just as easilt use range(len(nps)) as tidx
-        # More accurately it might be of the form # [[1, 2, 3], [4, 5], [6, 7, 8, 9], [1, 2, 3], [1, 2, 3], [6, 7, 8, 9], [4, 5]]
         nps = note_position_score.copy()
         
         # Offset the note and duration values by the min index to get their index
@@ -140,14 +130,21 @@ class MusicVocab():
         note_min_idx, _ = self.note_range
         dur_min_idx, _ = self.duration_range
         note_idx_score = note_dur_score + np.array([note_min_idx, dur_min_idx])
+
         note_idx_score = note_idx_score.reshape(-1) # Flatten note and duration into a single dimension
         pos_score = np.repeat(nps[:, 2], 2) # Double up positions for flattened note and duration
         idx_pos_score = np.stack([note_idx_score, pos_score], axis=1) # Restack note/dur with position
         
-        # Given the suggested vocab doesn't have merges, we just chunk by timestep, find and replace, then unchunk.
+        # Chunk by timestep, find and replace, then unchunk.
+
+        # [1, 2, 3], [4, 5], [6, 7, 8, 9], [1, 2, 3], [1, 2, 3], [6, 7, 8, 9], [4, 5]]
         grouped_score = self.group_by_timestep(idx_pos_score)
-        replaced_score = [self.actions.index(action) if action in self.actions else action for action in grouped_score]
+
+        # [[11], [10], [6, 7, 8, 9], [11], [11], [6, 7, 8, 9], [10]] # These should be offset by the original vocab length
+        replaced_score = [[self.initial_size + self.actions.index(action)] if action in self.actions else action for action in grouped_score]
         
+        # [11, 10, 6, 7, 8, 9, 11, 11, 6, 7, 8, 9, 10]
+        # [0, 1, 2, 2, 2, 2, 3, 4, 5, 5, 5, 5, 6]
         note_idx_score = []
         pos_score = []
         for position, action in enumerate(replaced_score):
