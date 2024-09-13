@@ -101,7 +101,8 @@ class MusicVocab():
         # [[4, 5], [1, 2, 3]] if num_actions is 2
         self.actions = [list(key) for key in sorted_actions.keys()][:num_actions]
         
-        for idx, action in enumerate(self.actions):
+        for i, action in enumerate(self.actions):
+            idx = initial_size + i
             value = ' '.join([self.itos(a) for a in action])
             self.itos[idx] = value
             self.stoi[value] = idx
@@ -134,34 +135,25 @@ class MusicVocab():
         # More accurately it might be of the form # [[1, 2, 3], [4, 5], [6, 7, 8, 9], [1, 2, 3], [1, 2, 3], [6, 7, 8, 9], [4, 5]]
         nps = note_position_score.copy()
         
-        note_dur_score = nps[:, :2] # Note and duration, drop tidx
-        
         # Offset the note and duration values by the min index to get their index
+        note_dur_score = nps[:, :2] # Note and duration, drop tidx
         note_min_idx, _ = self.note_range
         dur_min_idx, _ = self.duration_range
         note_idx_score = note_dur_score + np.array([note_min_idx, dur_min_idx])
-
         note_idx_score = note_idx_score.reshape(-1) # Flatten note and duration into a single dimension
         pos_score = np.repeat(nps[:, 2], 2) # Double up positions for flattened note and duration
+        idx_pos_score = np.stack([note_idx_score, pos_score], axis=1) # Restack note/dur with position
         
-
-        # Given the suggested vocab doesn't have merges, we could just chunk by timestep, find and replace, then unchunk. **** <---------
-        # Following the example above where our vocab ended up as [[4, 5], [1, 2, 3]] we would replace all instances of those pairs with the respective new token, keeping the timestep, before unchunking
-
-        while True:
-
-            stats = self.get_stats(note_idx_score)
-
-            # Iterate keys and get the pair with the min key that exists in merges so we do earlier merges first
-            pair = min(stats, key=lambda p: self.merges.get(p, float('inf')))
-            
-            if pair not in self.merges:
-                print("No more merges to do")
-                break
-            else:
-                idx = self.merges[pair]
-                print(f"Replacing {pair} with token {idx}")
-                note_idx_score, pos_score = self.merge(note_idx_score, pos_score, pair, idx)
+        # Given the suggested vocab doesn't have merges, we just chunk by timestep, find and replace, then unchunk.
+        grouped_score = self.group_by_timestep(idx_pos_score)
+        replaced_score = [self.actions.index(action) if action in self.actions else action for action in grouped_score]
+        
+        note_idx_score = []
+        pos_score = []
+        for position, action in enumerate(replaced_score):
+            for index in action:
+                note_idx_score.append(index)
+                pos_score.append(position)
 
         return np.array(note_idx_score), np.array(pos_score)
     
