@@ -69,6 +69,7 @@ class MusicVocab():
     def train(self, dataset, max_vocab_size):
 
         # We can't byte pair encode because of timestep boundaries, but we can add single aggregated timestep tokens to the vocab
+        # These will always have one <sep> followed by a duration at the end.
         # To 'train', just group by timestep, count how many of each action group there are and the most common n become the new tokens
 
         if self.actions is not None:
@@ -78,7 +79,7 @@ class MusicVocab():
         found_actions = {}
 
         # Nested tensor. Don't flatten as we want position grouping to be per song, otherwise actions will be merged across songs.
-        dataset = dataset.data.detach().cpu().tolist()
+        dataset = [t.detach().cpu().tolist() for t in dataset.data.unbind()] # dataset.data.detach().cpu().tolist()
         
         for idxs in dataset:
             # [(1, 2, 3), (4, 5), (6, 7, 8, 9), (1, 2, 3), (1, 2, 3), (6, 7, 8, 9), (4, 5), (4, 5), (4, 5)]
