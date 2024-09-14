@@ -61,11 +61,11 @@ class MusicVocab():
                 grouped[time] = []
             grouped[time].append(value)
         
-        print(f"Grouped by timestep: {grouped}") # This will merge timestep n from song 1 and timestep n from song 2...
         result = [tuple(values) for values in grouped.values()]
         return result
 
     # Pass in data already encoded using untrained vocab
+    @torch.no_grad()
     def train(self, dataset, max_vocab_size):
 
         # We can't byte pair encode because of timestep boundaries, but we can add single aggregated timestep tokens to the vocab
@@ -79,11 +79,11 @@ class MusicVocab():
         found_actions = {}
 
         # Nested tensor. Don't flatten as we want position grouping to be per song, otherwise actions will be merged across songs.
-        dataset = [t.detach().cpu().tolist() for t in dataset.data.unbind()] # dataset.data.detach().cpu().tolist()
+        data = [t.flatten(0,1) for t in dataset.data.detach().cpu().unbind()] # dataset.data.detach().cpu().tolist()
         
-        for idxs in dataset:
+        for idxs in data:
             # [(1, 2, 3), (4, 5), (6, 7, 8, 9), (1, 2, 3), (1, 2, 3), (6, 7, 8, 9), (4, 5), (4, 5), (4, 5)]
-            grouped_idxs = self.group_by_timestep(idxs)
+            grouped_idxs = self.group_by_timestep(idxs.tolist())
             # Count how many of each action group there are, ignoring padding
             for action in grouped_idxs:
                 if self.pad_idx in action: 
@@ -96,7 +96,6 @@ class MusicVocab():
         # Sort actions number of occurences and take the top num_actions keys
         # {(4, 5): 4, (1, 2, 3): 3, (6, 7, 8, 9): 2}
         sorted_actions = {k: v for k, v in sorted(found_actions.items(), key=lambda item: item[1], reverse=True)}
-        print(f"Found {len(sorted_actions)} unique actions: {sorted_actions}")
 
         # [[4, 5], [1, 2, 3]] if num_actions is 2
         self.actions = [list(key) for key in sorted_actions.keys()][:num_actions]
