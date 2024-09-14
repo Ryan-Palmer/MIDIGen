@@ -79,12 +79,15 @@ class MusicVocab():
         idxs = torch.cat([t.flatten(0,1) for t in dataset.data.unbind()]) # Flatten the nested tensor
         idxs = idxs.detach().cpu().tolist()
 
-        # Of the form # [[1, 2, 3], [4, 5], [6, 7, 8, 9], [1, 2, 3], [1, 2, 3], [6, 7, 8, 9], [4, 5], [4, 5], [4, 5]]
+        # Of the form # [(1, 2, 3), (4, 5), (6, 7, 8, 9), (1, 2, 3), (1, 2, 3), (6, 7, 8, 9), (4, 5), (4, 5), (4, 5)]
         grouped_idxs = self.group_by_timestep(idxs)
 
-        # Count how many of each action group there are
+        # Count how many of each action group there are, ignoring padding
         for action in grouped_idxs:
-            found_actions[action] = found_actions.get(action, 0) + 1
+            if self.pad_idx in action: 
+                continue
+            else:
+                found_actions[action] = found_actions.get(action, 0) + 1
 
         num_actions = max_vocab_size - self.initial_size
 
