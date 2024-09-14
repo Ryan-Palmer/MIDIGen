@@ -53,15 +53,19 @@ class MusicVocab():
         return [self.idx_to_elem[idx] for idx in idxs]
 
     # [[1, 0], [2, 0], [3, 0], [4, 1], [5, 1], [6, 2], [7, 2], [8, 2], [9, 2]]
+    # [((1, 2, 3),0), ((4, 5),1), ((6, 7, 8, 9),2)]
     # [(1, 2, 3), (4, 5), (6, 7, 8, 9)]
-    def group_by_timestep(self, data):
+    def group_by_timestep(self, data, include_position=False):
         grouped = {}
-        for value, time in data:
-            if time not in grouped:
-                grouped[time] = []
-            grouped[time].append(value)
+        for idx, position in data:
+            if position not in grouped:
+                grouped[position] = []
+            grouped[position].append(idx)
         
-        result = [tuple(values) for values in grouped.values()]
+        if include_position:
+            result = [(tuple(values), position) for position, values in grouped.items()]
+        else:
+            result = [tuple(values) for values in grouped.values()]
         return result
 
     # Pass in data already encoded using untrained vocab
@@ -97,8 +101,8 @@ class MusicVocab():
         # {(4, 5): 4, (1, 2, 3): 3, (6, 7, 8, 9): 2}
         sorted_actions = {k: v for k, v in sorted(found_actions.items(), key=lambda item: item[1], reverse=True)}
 
-        # [[4, 5], [1, 2, 3]] if num_actions is 2
-        self.actions = [list(key) for key in sorted_actions.keys()][:num_actions]
+        # [(4, 5), (1, 2, 3)] if num_actions is 2
+        self.actions = list(sorted_actions.keys())[:num_actions]
         
         for i, action in enumerate(self.actions):
             idx = self.initial_size + i
@@ -126,6 +130,13 @@ class MusicVocab():
         self.idx_to_elem = state_dict['idx_to_elem']
         self.itos = {k:self.to_tokens(v) for k,v in enumerate(self.idx_to_elem.values())}
         self.stoi = {v:k for k,v in enumerate(self.itos.values())}
+
+    # Define a function to handle the transformation logic
+    def try_replace(self, action, position):
+        if action in self.actions:
+            return (self.initial_size + self.actions.index(action), position)
+        else:
+            return (action, position)
     
     def encode(self, note_position_score):
         nps = note_position_score.copy()
@@ -142,17 +153,17 @@ class MusicVocab():
         
         # Chunk by timestep, find and replace, then unchunk.
 
-        # [1, 2, 3], [4, 5], [6, 7, 8, 9], [1, 2, 3], [1, 2, 3], [6, 7, 8, 9], [4, 5]]
-        grouped_score = self.group_by_timestep(idx_pos_score)
+        # [((1, 2, 3),0), ((4, 5),1), ((6, 7, 8, 9),2), ((1, 2, 3),3), ((1, 2, 3),4), ((6, 7, 8, 9),5), ((4, 5),6), ((4, 5),7), ((4, 5),8)]
+        grouped_score = self.group_by_timestep(idx_pos_score, include_position=True)
 
-        # [[11], [10], [6, 7, 8, 9], [11], [11], [6, 7, 8, 9], [10]] # Action index offset by the original vocab length
-        replaced_score = [[self.initial_size + self.actions.index(action)] if action in self.actions else action for action in grouped_score]
+        # [((11),0), ((10),1), ((6, 7, 8, 9),2), ((11),3), ((11),4), ((6, 7, 8, 9),5), ((10),6)] # Action index offset by the original vocab length
+        replaced_score = [self.try_replace(action, position) for action, position in grouped_score]
         
         # [11, 10, 6, 7, 8, 9, 11, 11, 6, 7, 8, 9, 10]
         # [0, 1, 2, 2, 2, 2, 3, 4, 5, 5, 5, 5, 6]
         note_idx_score = []
         pos_score = []
-        for position, action in enumerate(replaced_score):
+        for action, position in replaced_score:
             for index in action:
                 note_idx_score.append(index)
                 pos_score.append(position)
