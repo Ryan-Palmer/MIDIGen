@@ -131,12 +131,12 @@ class MusicVocab():
         self.itos = {k:self.to_tokens(v) for k,v in enumerate(self.idx_to_elem.values())}
         self.stoi = {v:k for k,v in enumerate(self.itos.values())}
 
-    # Define a function to handle the transformation logic
+    # Convert to list as you can't have a single element tuple and we want to iterate below
     def try_replace(self, action, position):
         if action in self.actions:
-            return (self.initial_size + self.actions.index(action), position)
+            return [[self.initial_size + self.actions.index(action)], position]
         else:
-            return (action, position)
+            return [list(action), position]
     
     def encode(self, note_position_score):
         nps = note_position_score.copy()
