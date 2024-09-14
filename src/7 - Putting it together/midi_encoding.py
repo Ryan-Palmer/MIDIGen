@@ -61,6 +61,7 @@ class MusicVocab():
                 grouped[time] = []
             grouped[time].append(value)
         
+        print(f"Grouped by timestep: {grouped}") # This will merge timestep n from song 1 and timestep n from song 2...
         result = [tuple(values) for values in grouped.values()]
         return result
 
@@ -76,24 +77,25 @@ class MusicVocab():
         # {(1,2,3) : 3, (4,5) : 4, (6,7,8,9) : 2}
         found_actions = {}
 
-        idxs = torch.cat([t.flatten(0,1) for t in dataset.data.unbind()]) # Flatten the nested tensor
-        idxs = idxs.detach().cpu().tolist()
-
-        # Of the form # [(1, 2, 3), (4, 5), (6, 7, 8, 9), (1, 2, 3), (1, 2, 3), (6, 7, 8, 9), (4, 5), (4, 5), (4, 5)]
-        grouped_idxs = self.group_by_timestep(idxs)
-
-        # Count how many of each action group there are, ignoring padding
-        for action in grouped_idxs:
-            if self.pad_idx in action: 
-                continue
-            else:
-                found_actions[action] = found_actions.get(action, 0) + 1
+        # Nested tensor. Don't flatten as we want position grouping to be per song, otherwise actions will be merged across songs.
+        dataset = dataset.data.detach().cpu().tolist()
+        
+        for idxs in dataset:
+            # [(1, 2, 3), (4, 5), (6, 7, 8, 9), (1, 2, 3), (1, 2, 3), (6, 7, 8, 9), (4, 5), (4, 5), (4, 5)]
+            grouped_idxs = self.group_by_timestep(idxs)
+            # Count how many of each action group there are, ignoring padding
+            for action in grouped_idxs:
+                if self.pad_idx in action: 
+                    continue
+                else:
+                    found_actions[action] = found_actions.get(action, 0) + 1
 
         num_actions = max_vocab_size - self.initial_size
 
         # Sort actions number of occurences and take the top num_actions keys
         # {(4, 5): 4, (1, 2, 3): 3, (6, 7, 8, 9): 2}
         sorted_actions = {k: v for k, v in sorted(found_actions.items(), key=lambda item: item[1], reverse=True)}
+        print(f"Found {len(sorted_actions)} unique actions: {sorted_actions}")
 
         # [[4, 5], [1, 2, 3]] if num_actions is 2
         self.actions = [list(key) for key in sorted_actions.keys()][:num_actions]
@@ -143,7 +145,7 @@ class MusicVocab():
         # [1, 2, 3], [4, 5], [6, 7, 8, 9], [1, 2, 3], [1, 2, 3], [6, 7, 8, 9], [4, 5]]
         grouped_score = self.group_by_timestep(idx_pos_score)
 
-        # [[11], [10], [6, 7, 8, 9], [11], [11], [6, 7, 8, 9], [10]] # These should be offset by the original vocab length
+        # [[11], [10], [6, 7, 8, 9], [11], [11], [6, 7, 8, 9], [10]] # Action index offset by the original vocab length
         replaced_score = [[self.initial_size + self.actions.index(action)] if action in self.actions else action for action in grouped_score]
         
         # [11, 10, 6, 7, 8, 9, 11, 11, 6, 7, 8, 9, 10]
