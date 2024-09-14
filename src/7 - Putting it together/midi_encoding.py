@@ -156,7 +156,7 @@ class MusicVocab():
         # [((1, 2, 3),0), ((4, 5),1), ((6, 7, 8, 9),2), ((1, 2, 3),3), ((1, 2, 3),4), ((6, 7, 8, 9),5), ((4, 5),6), ((4, 5),7), ((4, 5),8)]
         grouped_score = self.group_by_timestep(idx_pos_score, include_position=True)
 
-        # [((11),0), ((10),1), ((6, 7, 8, 9),2), ((11),3), ((11),4), ((6, 7, 8, 9),5), ((10),6)] # Action index offset by the original vocab length
+        # [[11],0], [[10],1], [[6, 7, 8, 9],2], [[11],3], [[11],4], [[6, 7, 8, 9],5], [[10],6]] # Action index offset by the original vocab length
         replaced_score = [self.try_replace(action, position) for action, position in grouped_score]
         
         # [11, 10, 6, 7, 8, 9, 11, 11, 6, 7, 8, 9, 10]
