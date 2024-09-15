@@ -171,9 +171,14 @@ class MusicVocab():
         return np.array(note_idx_score), np.array(pos_score)
     
     def decode(self, note_idx_score):
-        # Convert idxs to positions and pair up note / durations
-        merge_chunks = [self.idx_to_elem[idx] for idx in note_idx_score]
-        position_score = np.array(list(chain(*merge_chunks))).reshape(-1, 2)
+        expanded_score =  np.concatenate([self.idx_to_elem[idx] for idx in note_idx_score])
+
+        # If odd number of tokens, discard the last token.
+        if expanded_score.shape[0] % 2 != 0:
+            expanded_score = expanded_score[:-1]
+
+        # Reshape into pairs of (note, duration).
+        position_score = expanded_score.reshape(-1, 2)
 
         # Offset the note and duration idxs by their respective min index to get their actual value
         if position_score.shape[0] != 0: 
@@ -401,10 +406,6 @@ def idx_to_position_enc(idx_score, vocab):
     # Filter out special tokens
     notes_durs_start, notes_durs_end = vocab.note_position_enc_range # range of non-special token values
     notes_durations_idx_score = idx_score[np.where((idx_score >= notes_durs_start) & (idx_score < notes_durs_end))]
-    
-    if notes_durations_idx_score.shape[0] % 2 != 0:
-        notes_durations_idx_score = notes_durations_idx_score[:-1]
-
     return vocab.decode(notes_durations_idx_score)
 
 def idx_to_stream_enc(idx_score, vocab):
