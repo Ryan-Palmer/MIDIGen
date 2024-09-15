@@ -396,9 +396,9 @@ class DecoderTransformer_KNN_XL(torch.nn.Module):
             max_file_length,
             device,
             use_knn = False,
-            n_embed = 384, # /6 heads = 64 per head
-            n_head = 6, 
-            n_layer = 6, 
+            n_embed = 512, # /8 heads = 64 per head
+            n_head = 8, 
+            n_layer = 8, 
             max_bar_position = 1024,
             top_k = 16,
             dropout = 0.2,
