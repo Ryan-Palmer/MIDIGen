@@ -7,7 +7,8 @@ RUN apt-get update \
     && apt-get install software-properties-common -y \
     && add-apt-repository ppa:mscore-ubuntu/mscore-stable \
     && apt-get update \
-    && apt-get install musescore -y
+    && apt-get install musescore -y \
+    && apt-get install fluidsynth -y
 
 RUN conda install -c pytorch -c nvidia faiss-gpu=1.8.0
 

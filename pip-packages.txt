@@ -4,3 +4,5 @@ music21
 matplotlib
 tb-nightly
 einops
+pretty_midi
+pyFluidSynth
