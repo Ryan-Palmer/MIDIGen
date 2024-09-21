@@ -42,18 +42,15 @@ class MidiDataset(Dataset):
 
     @torch.no_grad()
     def load_samples(self, device):
-
-        print('Encoding')
-        self.ensure_encoded()
-        print('Encoded')
-        
         data = []
         file_lengths = []
         for midi_file_path in self.midi_file_paths:
             file_name = midi_file_path.name[:-4]
             encoded_file_path = Path(self.score_path, f'{file_name}.npy')
-            idx_score = np.load(encoded_file_path, allow_pickle=True)
+            if not encoded_file_path.exists():
+                continue
 
+            idx_score = np.load(encoded_file_path, allow_pickle=True)
             samples = []
             
             # Split idx_score into blocks of size sample_length, padding the last blocks if necessary
