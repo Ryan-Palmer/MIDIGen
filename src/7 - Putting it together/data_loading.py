@@ -17,7 +17,7 @@ def encode_file(vocab, score_path, midi_file_path):
             if (idx_score is not None):
                 np.save(score_file_path, idx_score)
     except Exception as e:
-        print(f'Error: {e}')
+        return
 
 class MidiDataset(Dataset):
     def __init__(self, vocab, midi_file_paths, score_path, sample_length, max_file_length):
@@ -31,6 +31,7 @@ class MidiDataset(Dataset):
         self.vocab = vocab
 
     def ensure_encoded(self):
+        self.score_path.mkdir(exist_ok=True)
         partial_encode_file = partial(encode_file, self.vocab, self.score_path)
         with Pool(processes=32) as pool:  # Adjust the number of processes based on your system
             pool.map(partial_encode_file, self.midi_file_paths)
