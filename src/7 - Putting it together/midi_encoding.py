@@ -14,10 +14,10 @@ m21.environment.set('musicxmlPath', musescore_path)
 m21.environment.set('musescoreDirectPNGPath', musescore_path)
 
 BEATS_PER_MEASURE = 4
-SAMPLES_PER_BEAT = 32 
-SAMPLES_PER_BAR = BEATS_PER_MEASURE * SAMPLES_PER_BEAT # i.e. 4 beats per bar and 32 samples per beat gives a resolution of 128th notes
+SAMPLES_PER_BEAT = 8
+SAMPLES_PER_BAR = BEATS_PER_MEASURE * SAMPLES_PER_BEAT # i.e. 4 beats per bar and 8 samples per beat gives a resolution of 32nd notes
 MIDI_NOTE_COUNT = 128
-MAX_NOTE_DUR = 8 * SAMPLES_PER_BAR # 8 bars of 32nd notes
+MAX_NOTE_DUR = 8 * SAMPLES_PER_BAR # 8 bars
 SEPARATOR_IDX = -1 # separator value for numpy encoding
 MIDI_NOTE_RANGE = (0, 127)
 SOS = '<|sos|>' # Start of sequence
