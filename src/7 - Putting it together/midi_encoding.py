@@ -81,9 +81,7 @@ class MusicVocab():
         
         # {(1,2,3) : 3, (4,5) : 4, (6,7,8,9) : 2}
         found_actions = {}
-
-        # Nested tensor. Don't flatten as we want position grouping to be per song, otherwise actions will be merged across songs.
-        data = [t.flatten(0,1) for t in dataset.data.detach().cpu().unbind()] # dataset.data.detach().cpu().tolist()
+        data = [t.flatten(0,1) for t in dataset.data.detach().cpu().unbind()]
         
         for idxs in data:
             # [(1, 2, 3), (4, 5), (6, 7, 8, 9), (1, 2, 3), (1, 2, 3), (6, 7, 8, 9), (4, 5), (4, 5), (4, 5)]
