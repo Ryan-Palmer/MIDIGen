@@ -32,9 +32,8 @@ class MidiDataset(Dataset):
 
     def ensure_encoded(self):
         partial_encode_file = partial(encode_file, self.vocab, self.score_path)
-        if __name__ == '__main__':
-            with Pool(processes=32) as pool:  # Adjust the number of processes based on your system
-                pool.map(partial_encode_file, self.midi_file_paths)
+        with Pool(processes=32) as pool:  # Adjust the number of processes based on your system
+            pool.map(partial_encode_file, self.midi_file_paths)
 
     @torch.no_grad()
     def load_samples(self, device):
