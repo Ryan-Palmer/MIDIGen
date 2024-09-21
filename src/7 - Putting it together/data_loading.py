@@ -8,13 +8,16 @@ from multiprocessing import Pool
 from functools import partial
 
 def encode_file(vocab, score_path, midi_file_path):
-    file_name = midi_file_path.name
-    score_file_path = Path(score_path, file_name)
-    encoded_file_path = Path(score_path, f'{file_name}.npy')
-    if not encoded_file_path.exists():
-        idx_score = midifile_to_idx_score(midi_file_path, vocab)
-        if (idx_score is not None):
-            np.save(score_file_path, idx_score)
+    try:
+        file_name = midi_file_path.name
+        score_file_path = Path(score_path, file_name)
+        encoded_file_path = Path(score_path, f'{file_name}.npy')
+        if not encoded_file_path.exists():
+            idx_score = midifile_to_idx_score(midi_file_path, vocab)
+            if (idx_score is not None):
+                np.save(score_file_path, idx_score)
+    except Exception as e:
+        print(f'Error: {e}')
 
 class MidiDataset(Dataset):
     def __init__(self, vocab, midi_file_paths, score_path, sample_length, max_file_length):
