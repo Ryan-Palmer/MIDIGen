@@ -42,8 +42,8 @@ class MidiDataset(Dataset):
         data = []
         file_lengths = []
         for midi_file_path in self.midi_file_paths:
-            file_name = midi_file_path.name
-            encoded_file_path = Path(self.score_path, f'{file_name[:3]}npy')
+            file_name = midi_file_path.name[:-4]
+            encoded_file_path = Path(self.score_path, f'{file_name}.npy')
             idx_score = np.load(encoded_file_path, allow_pickle=True)
 
             samples = []
