@@ -15,8 +15,12 @@ def encode_file(vocab, score_path, midi_file_path):
         if not encoded_file_path.exists():
             idx_score = midifile_to_idx_score(midi_file_path, vocab)
             if (idx_score is not None):
+                # print(f'Saving {encoded_file_path}')
                 np.save(score_file_path, idx_score)
+            # else:
+            #     print(f'Failed to encode {midi_file_path}')
     except Exception as e:
+        # print(f'Exception for {midi_file_path}: {e}')
         return
 
 class MidiDataset(Dataset):
@@ -38,9 +42,11 @@ class MidiDataset(Dataset):
 
     @torch.no_grad()
     def load_samples(self, device):
+
         print('Encoding')
         self.ensure_encoded()
         print('Encoded')
+        
         data = []
         file_lengths = []
         for midi_file_path in self.midi_file_paths:

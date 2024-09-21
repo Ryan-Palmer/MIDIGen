@@ -79,6 +79,10 @@ class MusicVocab():
         if self.actions is not None:
             raise Exception("Already trained")
         
+        if self.initial_size == max_vocab_size:
+            self.actions = []
+            return
+        
         # {(1,2,3) : 3, (4,5) : 4, (6,7,8,9) : 2}
         found_actions = {}
         data = [t.flatten(0,1) for t in dataset.data.detach().cpu().unbind()]
