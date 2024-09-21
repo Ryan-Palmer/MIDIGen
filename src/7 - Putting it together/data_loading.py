@@ -9,7 +9,7 @@ from functools import partial
 
 def encode_file(vocab, score_path, midi_file_path):
     try:
-        file_name = midi_file_path.name
+        file_name = midi_file_path.name[:-4]
         score_file_path = Path(score_path, file_name)
         encoded_file_path = Path(score_path, f'{file_name}.npy')
         if not encoded_file_path.exists():
@@ -38,7 +38,9 @@ class MidiDataset(Dataset):
 
     @torch.no_grad()
     def load_samples(self, device):
+        print('Encoding')
         self.ensure_encoded()
+        print('Encoded')
         data = []
         file_lengths = []
         for midi_file_path in self.midi_file_paths:
