@@ -1,41 +1,47 @@
 import numpy as np
-from torch.utils.data import Dataset, DataLoader, Sampler
+from torch.utils.data import Dataset, Sampler
 from pathlib import Path
 from midi_encoding import *
 import torch
 from itertools import cycle
+from multiprocessing import Pool
+from functools import partial
+
+def encode_file(vocab, score_path, midi_file_path):
+    file_name = midi_file_path.name
+    score_file_path = Path(score_path, file_name)
+    encoded_file_path = Path(score_path, f'{file_name}.npy')
+    if not encoded_file_path.exists():
+        idx_score = midifile_to_idx_score(midi_file_path, vocab)
+        if (idx_score is not None):
+            np.save(score_file_path, idx_score)
 
 class MidiDataset(Dataset):
-    def __init__(self, file_names, midi_path, score_path, sample_length, max_file_length):
-        self.file_names = file_names
+    def __init__(self, vocab, midi_file_paths, score_path, sample_length, max_file_length):
+        self.midi_file_paths = midi_file_paths
         self.data = None
         self.file_lengths = None
         self.total_samples = 0
         self.sample_length = sample_length
-        self.midi_path = midi_path
         self.score_path = score_path
         self.max_file_length = max_file_length
+        self.vocab = vocab
+
+    def ensure_encoded(self):
+        partial_encode_file = partial(encode_file, self.vocab, self.score_path)
+        if __name__ == '__main__':
+            with Pool(processes=32) as pool:  # Adjust the number of processes based on your system
+                pool.map(partial_encode_file, self.midi_file_paths)
 
     @torch.no_grad()
-    def load_samples(self, vocab, device):
+    def load_samples(self, device):
+        self.ensure_encoded()
         data = []
         file_lengths = []
-        for file_name in self.file_names:
-
-            midi_file_path = Path(self.midi_path, file_name)
-            score_file_path = Path(self.score_path, file_name)
+        for midi_file_path in self.midi_file_paths:
+            file_name = midi_file_path.name
             encoded_file_path = Path(self.score_path, f'{file_name}.npy')
-
-            if (encoded_file_path.exists()):
-                # print(f'Loading {score_file_path}')
-                idx_score = np.load(encoded_file_path, allow_pickle=True)
-            else:
-                # print(f'Processing {midi_file_path}')
-                idx_score = midifile_to_idx_score(midi_file_path, vocab)
-                if (idx_score is None): # Skip files that could not be processed
-                    # print(f'Could not process {midi_file_path}')
-                    continue
-                np.save(score_file_path, idx_score)
+            idx_score = np.load(encoded_file_path, allow_pickle=True)
 
             samples = []
             
@@ -46,7 +52,7 @@ class MidiDataset(Dataset):
                     last_tidx = block[-1, 1]
                     pad_tidx = last_tidx + 1
                     padding_count = self.sample_length - len(block)
-                    padding = np.stack([[vocab.pad_idx, pad_tidx]] * padding_count)
+                    padding = np.stack([[self.vocab.pad_idx, pad_tidx]] * padding_count)
                     block = np.concatenate([block, padding])
 
                 samples.append(block)
