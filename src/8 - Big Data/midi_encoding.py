@@ -14,10 +14,10 @@ m21.environment.set('musicxmlPath', musescore_path)
 m21.environment.set('musescoreDirectPNGPath', musescore_path)
 
 BEATS_PER_MEASURE = 4
-SAMPLES_PER_BEAT = 32 
-SAMPLES_PER_BAR = BEATS_PER_MEASURE * SAMPLES_PER_BEAT # i.e. 4 beats per bar and 32 samples per beat gives a resolution of 128th notes
+SAMPLES_PER_BEAT = 8 
+SAMPLES_PER_BAR = BEATS_PER_MEASURE * SAMPLES_PER_BEAT # i.e. 4 beats per bar and 8 samples per beat gives a resolution of 32nd notes
 MIDI_NOTE_COUNT = 128
-MAX_NOTE_DUR = 8 * SAMPLES_PER_BAR # 8 bars of 128th notes
+MAX_NOTE_DUR = 8 * SAMPLES_PER_BAR
 SEPARATOR_IDX = -1 # separator value for numpy encoding
 MIDI_NOTE_RANGE = (0, 127)
 SOS = '<|sos|>' # Start of sequence
@@ -246,7 +246,7 @@ def stream_to_sparse_enc(stream_score, note_size=MIDI_NOTE_COUNT, sample_freq=SA
     return sparse_score
 
 # Pass in the 'one-hot' encoded numpy score
-def sparse_to_position_enc(sparse_score, skip_last_rest=True):
+def sparse_to_position_enc(sparse_score, skip_last_rest=True, max_note_dur=MAX_NOTE_DUR):
 
     def encode_timestep(acc, timestep):
         encoded_timesteps, wait_count, tidx = acc
@@ -255,8 +255,9 @@ def sparse_to_position_enc(sparse_score, skip_last_rest=True):
             wait_count += 1
         else:
             if wait_count > 0:
-                separator_position = tidx - wait_count
-                encoded_timesteps.append([SEPARATOR_IDX, wait_count, separator_position]) # add rests
+                clamped_duration = max_note_dur if max_note_dur is not None and wait_count > max_note_dur else wait_count
+                separator_position = tidx - clamped_duration
+                encoded_timesteps.append([SEPARATOR_IDX, clamped_duration, separator_position]) # add rests
             encoded_timesteps.extend(encoded_timestep)
             wait_count = 1
         

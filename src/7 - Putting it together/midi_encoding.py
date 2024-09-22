@@ -6,8 +6,6 @@ import numpy as np
 from itertools import chain
 from itertools import groupby
 from functools import reduce
-from typing import Collection, List
-from pathlib import Path
 import music21 as m21
 musescore_path = '/usr/bin/mscore'
 m21.environment.set('musicxmlPath', musescore_path)
@@ -147,11 +145,11 @@ class MusicVocab():
         note_dur_score = nps[:, :2] # Note and duration, drop tidx
         note_min_idx, _ = self.note_range
         dur_min_idx, _ = self.duration_range
-        note_idx_score = note_dur_score + np.array([note_min_idx, dur_min_idx])
+        idx_score = note_dur_score + np.array([note_min_idx, dur_min_idx])
 
-        note_idx_score = note_idx_score.reshape(-1) # Flatten note and duration into a single dimension
+        idx_score = idx_score.reshape(-1) # Flatten note and duration into a single dimension
         pos_score = np.repeat(nps[:, 2], 2) # Double up positions for flattened note and duration
-        idx_pos_score = np.stack([note_idx_score, pos_score], axis=1) # Restack note/dur with position
+        idx_pos_score = np.stack([idx_score, pos_score], axis=1) # Restack note/dur with position
         
         # Chunk by timestep, find and replace, then unchunk.
 
@@ -163,14 +161,14 @@ class MusicVocab():
         
         # [11, 10, 6, 7, 8, 9, 11, 11, 6, 7, 8, 9, 10]
         # [0, 1, 2, 2, 2, 2, 3, 4, 5, 5, 5, 5, 6]
-        note_idx_score = []
+        idx_score = []
         pos_score = []
         for action, position in replaced_score:
             for index in action:
-                note_idx_score.append(index)
+                idx_score.append(index)
                 pos_score.append(position)
 
-        return np.array(note_idx_score), np.array(pos_score)
+        return np.array(idx_score), np.array(pos_score)
     
     def decode(self, note_idx_score):
         expanded_score =  np.concatenate([self.idx_to_elem[idx] for idx in note_idx_score])
@@ -244,7 +242,7 @@ def stream_to_sparse_enc(stream_score, note_size=MIDI_NOTE_COUNT, sample_freq=SA
     return sparse_score
 
 # Pass in the 'one-hot' encoded numpy score
-def sparse_to_position_enc(sparse_score, skip_last_rest=True):
+def sparse_to_position_enc(sparse_score, skip_last_rest=True, max_note_dur=MAX_NOTE_DUR):
 
     def encode_timestep(acc, timestep):
         encoded_timesteps, wait_count, tidx = acc
@@ -253,8 +251,9 @@ def sparse_to_position_enc(sparse_score, skip_last_rest=True):
             wait_count += 1
         else:
             if wait_count > 0:
-                separator_position = tidx - wait_count
-                encoded_timesteps.append([SEPARATOR_IDX, wait_count, separator_position]) # add rests
+                clamped_duration = max_note_dur if max_note_dur is not None and wait_count > max_note_dur else wait_count
+                separator_position = tidx - clamped_duration
+                encoded_timesteps.append([SEPARATOR_IDX, clamped_duration, separator_position]) # add rests
             encoded_timesteps.extend(encoded_timestep)
             wait_count = 1
         

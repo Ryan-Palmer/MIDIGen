@@ -37,20 +37,28 @@ class MidiDataset(Dataset):
     def ensure_encoded(self):
         self.score_path.mkdir(exist_ok=True)
         partial_encode_file = partial(encode_file, self.vocab, self.score_path)
-        with Pool(processes=32) as pool:  # Adjust the number of processes based on your system
+        with Pool(processes=24) as pool:  # Adjust the number of processes based on your system
             pool.map(partial_encode_file, self.midi_file_paths)
 
     @torch.no_grad()
     def load_samples(self, device):
+
+        print('Encoding')
+        self.ensure_encoded()
+        print('Encoded')
+        
         data = []
         file_lengths = []
         for midi_file_path in self.midi_file_paths:
             file_name = midi_file_path.name[:-4]
             encoded_file_path = Path(self.score_path, f'{file_name}.npy')
+
             if not encoded_file_path.exists():
+                # print(f'Encoded file not found: {encoded_file_path}')
                 continue
 
             idx_score = np.load(encoded_file_path, allow_pickle=True)
+
             samples = []
             
             # Split idx_score into blocks of size sample_length, padding the last blocks if necessary
