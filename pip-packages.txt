@@ -2,7 +2,7 @@ jupyterlab
 numpy == 1.26.4
 music21
 matplotlib
-tb-nightly
+tensorboard
 einops
 pretty_midi
 pyFluidSynth

@@ -315,10 +315,23 @@ def import_midi_file(file_path):
 def midifile_to_stream(midifile): 
     return m21.midi.translate.midiFileToStream(midifile)
 
+# def midifile_to_idx_score(file_path, vocab):
+#     midifile = import_midi_file(file_path)
+#     stream = midifile_to_stream(midifile)
+#     time_sigs = stream.getTimeSignatures()
+#     if len(time_sigs) == 1 and time_sigs[0].ratioString == '4/4':
+#         sparse_score = stream_to_sparse_enc(stream)
+#         note_pos_score = sparse_to_position_enc(sparse_score)
+#         return position_to_idx_enc(note_pos_score, vocab)
+#     else:
+#         return None
+    
+valid_signatures = ['4/4', '2/4', '1/4', '8/8']
+
 def midifile_to_idx_score(file_path, vocab):
     midifile = import_midi_file(file_path)
     stream = midifile_to_stream(midifile)
-    if stream.getTimeSignatures()[0].ratioString == '4/4':
+    if all(timeSignature.ratioString in valid_signatures for timeSignature in stream.getTimeSignatures()):
         sparse_score = stream_to_sparse_enc(stream)
         note_pos_score = sparse_to_position_enc(sparse_score)
         return position_to_idx_enc(note_pos_score, vocab)
