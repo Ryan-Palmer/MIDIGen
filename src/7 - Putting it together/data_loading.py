@@ -91,7 +91,7 @@ class MidiDataset(Dataset):
         file_idx = idx[0]
         sample_idx = idx[1]
         sample = self.data[file_idx, sample_idx] # = self.data[idx]
-        return file_idx, sample
+        return file_idx, sample # TODO return idx instead of just file_idx, this will fix the epoch counter
     
 class ContiguousBatchSampler(Sampler):
     def __init__(self, dataset):
