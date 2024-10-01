@@ -138,8 +138,7 @@ class ContiguousBatchSampler(Sampler):
             self.batches.append(batch)
 
     def __iter__(self):
-        for batch in cycle(self.batches):
-            yield batch
+        return iter(self.batches)
 
     def __len__(self):
         return len(self.batches)
