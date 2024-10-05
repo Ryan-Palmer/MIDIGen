@@ -1,3 +1,4 @@
+import os
 import numpy as np
 from torch.utils.data import Dataset, Sampler
 from pathlib import Path
@@ -37,15 +38,16 @@ class MidiDataset(Dataset):
     def ensure_encoded(self):
         self.score_path.mkdir(exist_ok=True)
         partial_encode_file = partial(encode_file, self.vocab, self.score_path)
-        with Pool(processes=24) as pool:  # Adjust the number of processes based on your system
+        with Pool(processes=28) as pool:  # Adjust the number of processes based on your system
             pool.map(partial_encode_file, self.midi_file_paths)
 
     @torch.no_grad()
-    def load_samples(self, device):
+    def load_samples(self, encoding_enabled, device):
 
-        print('Encoding')
-        self.ensure_encoded()
-        print('Encoded')
+        if encoding_enabled:
+            print('Encoding')
+            self.ensure_encoded()
+            print('Encoded')
         
         data = []
         file_lengths = []
@@ -57,7 +59,18 @@ class MidiDataset(Dataset):
                 # print(f'Encoded file not found: {encoded_file_path}')
                 continue
 
-            idx_score = np.load(encoded_file_path, allow_pickle=True)
+            if os.path.getsize(encoded_file_path) == 0:
+                print(f'Encoded file is empty: {encoded_file_path}')
+                continue
+
+            try:
+                idx_score = np.load(encoded_file_path, allow_pickle=True)
+            except EOFError:
+                print(f'EOFError: No data left in file {encoded_file_path}')
+                continue
+            except Exception as e:
+                print(f'Error loading file {encoded_file_path}: {e}')
+                continue
 
             samples = []
             

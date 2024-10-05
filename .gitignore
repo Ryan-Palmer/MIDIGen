@@ -14,9 +14,9 @@ src/5 - TransformerXL/__pycache__/
 src/data/checkpoints/
 src/6 - Byte Pair Encoding/__pycache__/
 src/7 - Putting it together/__pycache__/
-src/data/midi/lakh_clean/
-src/data/midi/lakh_clean_piano/
-src/data/midi/lakh_clean_piano_128/
-src/data/midi/lakh_clean_piano_64/
 src/8 - Big Data/__pycache__/
 src/data/midi/lakh_piano-vg_large/
+src/data/midi/lakh/
+src/data/midi/lakh_clean/
+src/data/midi/lakh_clean_piano-vg_large/
+src/data/midi/lakh_full_piano-vg_large/
