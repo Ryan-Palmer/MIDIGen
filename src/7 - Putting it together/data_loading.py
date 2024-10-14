@@ -38,7 +38,7 @@ class MidiDataset(Dataset):
     def ensure_encoded(self):
         self.score_path.mkdir(exist_ok=True)
         partial_encode_file = partial(encode_file, self.vocab, self.score_path)
-        with Pool(processes=28) as pool:  # Adjust the number of processes based on your system
+        with Pool(processes=20) as pool:  # Adjust the number of processes based on your system
             pool.map(partial_encode_file, self.midi_file_paths)
 
     @torch.no_grad()

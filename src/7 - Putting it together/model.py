@@ -11,9 +11,7 @@ import faiss
 import math
 import faiss.contrib.torch_utils
 
-cache_size_gb = 8
 resources = faiss.StandardGpuResources() 
-resources.setTempMemory(cache_size_gb * 1024 * 1024 * 1024)
 
 class KNN():
 
@@ -63,6 +61,7 @@ class KNN():
     @torch.no_grad()
     def clear(self):
         self.index.reset()
+        del self.db
         self.db = torch.zeros(self.shape, dtype = torch.float32, device=self.device)
         self.db_offset = 0
 
