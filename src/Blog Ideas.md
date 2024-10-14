@@ -33,11 +33,98 @@ In addition to the resources linked above, this project leant heavily on Andrew 
 
 ## MIDI format
 
+The [MIDI format](https://en.wikipedia.org/wiki/MIDI) (**M**usical **I**nstrument **D**igital **I**nterface) was developed in the early 1980s as a universal data and hardware standard which allows devices and software developed by different manufacturers to share a common language.
+
+The data and its associated file format(s) effectively represent a digital music score which can be played back on any instrument(s) that support the standard.
+
+Its longevity and popularity make MIDI an ideal source of data for a machine learning project. Also, unlike audio data, the score for a piece of music takes up a relatively tiny space and so much more can be loaded into memory and processed quickly. They mostly comprise of note on / off events and performance information (e.g pitchbend) along with some metadata describing things such as instrument choice and tempo.
+
+There are lots of great sources of MIDI files if you [look around on the internet](https://github.com/albertmeronyo/awesome-midi-sources). I began with a relatively small set of [video game](https://www.vgmusic.com/) music and eventually worked with the entire [Lakh MIDI Dataset](https://colinraffel.com/projects/lmd/) which comprises around 200,000 songs in almost every style you can imagine.
+
 ## Tools to load and visualise
+
+There are some great libraries available for loading and working with MIDI files in Python.
+
+This project mainly uses [Music21](https://www.music21.org/music21docs/about/what.html) which is very mature and fully featured. It allows you to load and save MIDI files, inspecting and changing their contents in its high level 'Stream' format.
+
+It also works well with [MuseScore](https://musescore.org/en) to render a piano-roll timeline or classical notation in the output cells of your [Jupyter Notebook](https://jupyter.org/). I used notebooks throughout this project to interleave code, output and thoughts / documentation (albeit via the [VSCode](https://code.visualstudio.com/) [Polyglot Notebooks extension](https://code.visualstudio.com/docs/languages/polyglot))
+
+Another python library I used is [pretty-midi](https://craffel.github.io/pretty-midi/) which has a great API and works well with [FluidSynth](https://www.fluidsynth.org/)'s synthesis engine to render the scores.
 
 ## Encoding / Decoding
 
+The MIDI data can't be fed directly into a machine learning model - at least not the kind we will be looking at. It first needs to be broken up into a series of tokens, which are each assigned a number. For instance, if we assigned `A=1`, `B=2`, `C=3`, `D=4` and `E=5`, then the words `CAB ACE` would be represented as `312 135`.
+
+Sounds easy enough - however, as hinted in the intro, this is where using music data rather than text presents its first challenge.
+
+- More than one note may be playing simultaneously
+- Notes have a position in time relative to each other
+
+The encoding process was therefore a bit more involved. It comprised of three steps:
+
+1. Sparse Score
+
+Convert the MIDI file into a giant array which held a value for every pitch at every step in time (and for every instrument!). The value describes if a note was started for how long (so a zero means 'no note' and a 4 means 'start a note which lasts for 4 steps').
+
+It is referred to as 'sparse' as it is quite literally nearly empty, as most steps on most instruments are zero.
+
+For example a single instrument might have
+
+```
+4 0 0 0 0 0 0 0 //... up to final timestep of song
+0 0 0 0 0 0 2 0
+0 2 0 0 0 0 2 0
+//... up to 128 rows
+```
+
+This takes 24 values to show
+
+- Step 1, Pitch 1 = start of a 4-step note
+- Step 2, Pitch 3 = start of a 2-step note
+- Step 7, Pitch 2 and 3 = start of a 2-step note.
+
+2. Position Score
+
+The sparse score isn't very memory or processing efficient, as it contains very little information given its size.
+
+We could, alternatively, just record when each note starts and for how long. This creates a much more compressed form of score. The previous sparse example can be re-written using 14 tokens as
+
+```
+1, 4
+-1, 1
+3, 2
+-1, 5
+2, 2
+3, 2
+-1, 2
+```
+
+where `-1` represents a gap before the next note.
+
+3. Index Score
+
+Now we just need to flatten all these values into a single list of tokens so we can feed it into our model, just like the text example of `CAB ACE` earlier.
+
+There are all sorts of different encoding schemes you could employ, many of which can be seen on the [MIDITok](https://miditok.readthedocs.io/en/latest/tokenizations.html) website (which I only just discovered!). What they more or less all have in common, including the one I used which was adapted from MusicAutoBot, are
+
+- Tokens for each note (of the 128 available in MIDI)
+- Tokens for each duration (from a single timestep all the way up to whatever limit you set on note length).
+- A few 'special' tokens for the start and end of a song, and for a gap of silence.
+
+Our example can now be rewritten as
+
+```
+<sos><n1><d4><sep><d1><n3><d2><sep><d5><n2><d2><n3><d2><sep><d2><eos>
+```
+
+These tokens are each assigned a number and that's it, our data is encoded and ready to go.
+
+To decode the data we just follow the reverse of this process, turning tokens into positions and positions into a sparse score before finally converting the sparse score into MIDI.
+
+
 ## Cross Entropy loss
+
+
 
 
 # Transformers
@@ -72,6 +159,15 @@ In addition to the resources linked above, this project leant heavily on Andrew 
 ## Challenges (time dimension)
 
 ## Findings
+
+
+# Training
+
+## Training loop
+
+## Monitoring
+
+## Experimenting
 
 
 # Conclusion
