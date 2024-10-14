@@ -24,7 +24,7 @@ I am a believer that knowledge is power - if you understand things, you can have
 
 With that in mind I have been racing to catch up and keep up with all of the developments in the ML space which is no mean feat, given the pace of the industry. Having done a lot of cramming with great books such as [Hands on Machine Learning](https://www.oreilly.com/library/view/hands-on-machine-learning/9781098125967/) and excellent video resources such as [Andrej Karpathy](https://www.youtube.com/playlist?list=PLAqhIrjkxbuWI23v9cThsA9GvCAUhRvKZ), [3Blue1Brown](https://www.youtube.com/playlist?list=PLZHQObOWTQDNU6R1_67000Dx_ZCJB-3pi) and [Statquest](https://www.youtube.com/playlist?list=PLblh5JKOoLUICTaGLRoHQDuF_7q2GfuJF)'s channels, I needed a personal project to really embed the knowledge in my mind. What better than picking up where I left off 11 years ago with music generation, but using all of the modern tools and techniques?
 
-And that brings us to this blog! I hope to at the very least highlight all the wonderful people and resources which helped me along the way. Additionally, I would love to help to de-mystify the topic and show that it really is accessible and understandable to anyone with a curious mind, both technical and non-technical.
+And that brings us to this blog! I hope to at the very least highlight all the wonderful people and leave a breadcrumb trail to the resources which helped me along the way. Additionally, I would love to help to de-mystify the topic and show that it really is accessible and understandable to anyone with a curious mind, both technical and non-technical.
 
 In addition to the resources linked above, this project leant heavily on Andrew Shaw's [MusicAutoBot](https://github.com/bearpelican/musicautobot/tree/master) project and Nick Ryan's [Coding a Paper](https://www.youtube.com/playlist?list=PLam9sigHPGwOe8VDoS_6VT4jjlgs9Uepb) series, which themselves were built upon the shoulders of giants. Thanks guys!
 
@@ -122,9 +122,31 @@ These tokens are each assigned a number and that's it, our data is encoded and r
 To decode the data we just follow the reverse of this process, turning tokens into positions and positions into a sparse score before finally converting the sparse score into MIDI.
 
 
-## Cross Entropy loss
+## Measuring performance
 
+Just like in essence a model like GPT-2 is a 'next word predictor', so we are building a 'next note predictor'. We are going to feed in a sequence of tokens and as the computer to predict what comes next, and we need a way to judge how well it has done.
 
+To calculate how good a set of predictions is, you could multiply the probabilities assigned to the correct characters. However, because each value is between 0 and 1, multiplying them together very quickly results in a tiny number which is hard for a computer to represent and not very nice to work with.
+
+For this reason, it is common to take the [log](https://www.mathsisfun.com/algebra/exponents-logarithms.html) of the probablility, known as the **log likelyhood**. This has two benefits:
+
+- It has a range from -infinity to zero (i.e. log(0) is -inf and log(1) is zero).
+
+- Where you would multiply probabilities, you *add* their logarithms. This prevents the result from getting tiny.
+
+If we take the *negative* of this value we get a range from zero to infinity - the **negative log likelyhood**, a measure of how *bad* our predictions were rather than how good.
+
+Finally, you divide by the count of samples to get the mean - the **average negative log likelyhood**.
+
+If our goal for the model is to minimise this value representing how bad we are, we are effectively saying 'maximise the likelyhood of the predictions being correct' - just what we want!
+
+The output of our model will be a value for each token in our vocabulary. We will interpret the value as the 'log counts' (or [logits](https://deepai.org/machine-learning-glossary-and-terms/logit)) - simply the log of the odds of that token occuring.
+
+Since the reverse of the log function is exponentiation (see the article linked above) we `exp` the logits to get the actual counts for a given token, and then divide that by the sum of all the counts to normalise the value (i.e. now the sum of all probabilities of all tokens will add to 1). This operation is known as the [softmax](https://en.wikipedia.org/wiki/Softmax_function) function. It has the effect of exaggerating large probabilities and minimising small ones.
+
+During training, we are asking the model to guess the next tokens for each sequence in the batch. Of course, we know the answer, so the loss is simply a measure of how confident it was in the correct token vs the others. This is known as [cross entropy](https://en.wikipedia.org/wiki/Cross-entropy#Cross-entropy_loss_function_and_logistic_regression).
+
+> I just found [this](https://www.naukri.com/code360/library/softmax-and-cross-entropy) article which nicely restates much of the above in more detail with examples, as the Wikipedia articles are a bit intense for the uninitiated! Also check out [this Statquest](https://www.youtube.com/watch?v=6ArSys5qHAU&ab_channel=StatQuestwithJoshStarmer). For a closer look at the close relationship between negative log likelyhood and cross entropy loss, [this is a great reference](https://towardsdatascience.com/cross-entropy-negative-log-likelihood-and-all-that-jazz-47a95bd2e81).
 
 
 # Transformers
