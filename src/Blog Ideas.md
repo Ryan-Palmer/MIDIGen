@@ -25,8 +25,7 @@ I hope to at least highlight all the wonderful people and leave a breadcrumb tra
 
 In addition to the resources linked above, this project leant heavily on Andrew Shaw's [MusicAutoBot](https://github.com/bearpelican/musicautobot/tree/master) project and Nick Ryan's [Coding a Paper](https://www.youtube.com/playlist?list=PLam9sigHPGwOe8VDoS_6VT4jjlgs9Uepb) series, which themselves were built upon the shoulders of giants. Thanks guys!
 
-
-# Basics
+# Data
 
 ## MIDI format
 
@@ -118,6 +117,75 @@ These tokens are each assigned a number and that's it, our data is encoded and r
 
 To decode the data we just follow the reverse of this process, turning tokens into positions and positions into a sparse score before finally converting the sparse score into MIDI.
 
+# Model
+
+Transformers are a particular class of machine learning model first introduced by Google in their landmark [Attention is all you Need](https://en.wikipedia.org/wiki/Attention_Is_All_You_Need) paper in 2017. 
+
+Until this point, generative models such as [Recurrent Neural Networks](https://en.wikipedia.org/wiki/Recurrent_neural_network) had two significant problems which limited their practical use.
+
+1. They were restricted in their ability to work with large contexts. That is to say, they quickly forgot things and lost the thread of meaning in a sequence, which limited their practical use. Additions such as [Long Short-Term Memory](https://en.wikipedia.org/wiki/Long_short-term_memory) helped with this to a degree.
+
+2. They had to process tokens in sequence order, which meant they did not parallelise easily and made them slow to train. It also restricted the models to only using *past* tokens to predict the future (although this could be worked around with [Bi-directional RNNS](https://en.wikipedia.org/wiki/Bidirectional_recurrent_neural_networks) for a further performance cost).
+
+Transformers solved these problems by looking at an entire sequence at once, considering the meaning of words and the relationships between them.
+
+I'm not going to try to give an in-depth explanation of transformer models here, as there are already great resources such as the Karpathy, 3Blue1Brown and Statquest channels already linked to at the start. In addition to those resources, I highly recommend checking out Neel Nanda's [Walkthrough of A Mathematical Framework for Transformer Circuits](https://www.youtube.com/watch?v=KV5gbOmHbjU&t=4s&ab_channel=NeelNanda) which gives a great intuition of how information flows through the model.
+
+I will just try to provide a high level description of what is going on in the context of this project. 
+
+Because we are making a 'next token generator' we are looking at a particular simple flavour of transformer known as 'decoder only'. (as opposed to 'encoder-decoder', which is used for e.g. translation tasks where you want to convert one sequence into another).
+
+> **Disclaimer!!!** I will be making heavy use of analogy and simplified concepts to get the general ideas across, which are definitely *not* rigorous or accurate descriptions of how the models actually work. In fact whilst the architecture and maths involved is remarkably simple, exactly how they create their output is still being researched, for instance in the [Mechanistic Interpretability](https://www.youtube.com/watch?v=veT2VI4vHyU&ab_channel=FAR%E2%80%A4AI) community.
+
+## Token Embeddings
+
+The [embedding layer](https://huggingface.co/blog/getting-started-with-embeddings) is the first part of a traditional transformer. It is where we convert tokens from their single assigned number (or 'index') into a bigger list of numbers which act as coordinates in a high-dimensional semantic space, representing their more general meaning.
+
+You might expect words that have similar meanings to have similar coordinates, and a word's opposite to be on the negative of it in that particular 'semantic plane'.
+
+For example maybe 'woof' and 'bark' might have similar coordinates in the 'animal noise' plane, and 'hot' / 'cold' might be positive and negative in the temperature plane.
+
+This allows every token to carry much more useful, general information as it heads into the network. They can also be worked with mathematically now that they are in some coordinate system (or 'vector space'). A common example used is `King - Man + Woman = Queen`.
+
+## Positional Embeddings
+
+The traditional text transformer architectures usually create another set of embeddings by assigning a position number to each item in the sequence, i.e 1 for the first token, 2 for the second and so on. This allows the model to incorporate information about position. It is reasonable to assume that being the first token in a sequence might be significant for example. 
+
+These positional embeddings are simply added to the token embeddings, combining their 'signals' into one data stream.
+
+Because our transformer is musical, we need to change things up a little.
+
+Firstly, rather than assign a simple static position to each token based on its sequence position, we use [relative positional embeddings](https://www.youtube.com/watch?v=FhL8ksbtiYg&list=PLam9sigHPGwOe8VDoS_6VT4jjlgs9Uepb&index=4&t=1040s&ab_channel=ChrisMcCormickAI). If the token being predicted is assigned 0, the one before it would be 1, and before that 2 etc, allowing us to know how far the tokens are away relative to the current position. The intuition is that closer tokens to the one being predicted are probably more important.
+
+Secondly, music has a cyclic counting structure of bars and beats. This is important information to feed to our model if we want it to learn and then generate musical output. To achieve this we take the absolute timestep of every token in the song and divide it by timesteps per beat and per bar to get the values we want to embed and add in.
+
+## Residual Pathway
+
+The embeddings are directly connected to the output predictions in a kind of superhighway through the network. Every other part of the model branches off from that stream of data, does whatever it does, then adds its output back into the stream. This is considered important as it prevents the original meaning of the tokens getting 'watered down' and lost as it flows through the network, as was the case with the original RNNs.
+
+It also allows the branched parts to be considered, both logically and mathematically, as independent modules (again, see the Neel Nanda walkthrough above for an awesome dive into this).
+
+## Attention
+
+One of the the key innovations in transformer models was the addition of [multi head attention](https://towardsdatascience.com/transformers-explained-visually-part-3-multi-head-attention-deep-dive-1c1ff1024853).
+
+These modules are the parts that analyse the relationships between tokens in a sequence. Each head in a multi-head layer might be focussing on a different kinds of information, for example various grammatical or semantic relationships. They can work in parallel, greatly speeding up training. Heads in layers further down the residual pathway might use information about relationships calculated and added in by earlier layers to make higher level associations.
+
+> Note the heavy use of 'might' and 'could' etc here - as mentioned earlier, exactly how they perform their calculations isn't clear or necessarily even consistent, but this is a decent starting intuition.
+
+They achieve this by once again embedding the input values branched from the residual stream, in fact three more times, to get values referred to as the `keys`, `queries` and `values`.
+
+The `key` indicates what a token represents in the relationship being examined, the `query` represents what it is interested in. and the `value` is its data. Each token's `query` is compared to every other token's `key` to get their 'attention scores' and depending on how close they are a proportional amount of that tokens `value` is emitted as the output.
+
+Because we are creating a next-token predictor, we mask off the keys of future tokens so that the model can't cheat and look ahead. This is in contrast to an encoder-decode transformer which might want to consider a whole sentence when translating a phrase from one language to another.
+
+Once this process of information swapping is complete, the output of all the heads in a layer are concatenated and fed through a traditional fully connected neural net, or [Multi Layer Perceptron](https://en.wikipedia.org/wiki/Multilayer_perceptron), which is simple a linear combination (i.e. weighted multiplication) of all the input values which is then fed through some kind of non-linear [activation function](https://towardsdatascience.com/activation-functions-neural-networks-1cbd9f8d91d6) to get the output values. It allows the model to in effect do some computation on the combined relationship information produced from the attention heads.
+
+The output from the MLP is then added back in to the residual stream.
+
+![Diagram of a simple transformer model from A Mathematical Framework for Transformer Circuits](image.png)
+#### Diagram of a simple transformer model from [A Mathematical Framework for Transformer Circuits](https://transformer-circuits.pub/2021/framework/index.html).
+
 
 ## Measuring performance
 
@@ -146,76 +214,30 @@ During training, we are asking the model to guess the next tokens for each seque
 > I found [this](https://www.naukri.com/code360/library/softmax-and-cross-entropy) article which nicely restates much of the above in more detail with examples, as the Wikipedia articles are a bit intense for the uninitiated! Also check out [this Statquest](https://www.youtube.com/watch?v=6ArSys5qHAU&ab_channel=StatQuestwithJoshStarmer). For a nice explanation of the close relationship between negative log likelyhood and cross entropy loss, [this is a great reference](https://towardsdatascience.com/cross-entropy-negative-log-likelihood-and-all-that-jazz-47a95bd2e81).
 
 
-# Transformers
-
-Transformers are a particular class of machine learning model first introduced by Google in their landmark [Attention is all you Need](https://en.wikipedia.org/wiki/Attention_Is_All_You_Need) paper in 2017. 
-
-Until this point, generative models such as [Recurrent Neural Networks](https://en.wikipedia.org/wiki/Recurrent_neural_network) had two significant problems which limited their practical use.
-
-1. They were restricted in their ability to work with large contexts. That is to say, they quickly forgot things and lost the thread of meaning in a sequence, which limited their practical use. Additions such as [Long Short-Term Memory](https://en.wikipedia.org/wiki/Long_short-term_memory) helped with this to a degree.
-
-2. They had to process tokens in sequence order, which meant they did not parallelise easily and made them slow to train. It also restricted the models to only using *past* tokens to predict the future (although this could be worked around with [Bi-directional RNNS](https://en.wikipedia.org/wiki/Bidirectional_recurrent_neural_networks) for a further performance cost).
-
-Transformers solved these problems by looking at an entire sequence at once, considering the meaning of words and the relationships between them.
-
-I'm not going to try to give an in-depth explanation of transformer models here, as there are already great resources such as the Karpathy, 3Blue1Brown and Statquest channels already linked to at the start. In addition to those resources, I highly recommend checking out Neel Nanda's [Walkthrough of A Mathematical Framework for Transformer Circuits](https://www.youtube.com/watch?v=KV5gbOmHbjU&t=4s&ab_channel=NeelNanda) which gives a great intuition of how information flows through the model.
-
-I will just try to provide a high level description of what is going on in the context of this project. 
-
-Because we are making a 'next token generator' we are looking at a particular simple flavour of transformer known as 'decoder only'. (as opposed to 'encoder-decoder', which is used for e.g. translation tasks where you want to convert one sequence into another).
-
-**Disclaimer!!!** I will be making heavy use of analogy and simplified concepts to get the general ideas across, which are definitely *not* rigorous or accurate descriptions of how the models actually work. In fact whilst the architecture and maths involved is remarkably simple, exactly how they create their output is still being researched, for instance in the Mechanistic Interpretability community.
-
-## Embeddings
-
-The [embedding layer](https://huggingface.co/blog/getting-started-with-embeddings) is the first part of a traditional transformer. It is where we convert tokens from their single assigned number (or 'index') into a bigger list of numbers which act as coordinates in a high-dimensional semantic space, representing their more general meaning.
-
-You might expect words that have similar meanings to have similar coordinates, and a word's opposite to be on the negative of it in that particular 'semantic plane'.
-
-For example maybe 'woof' and 'bark' might have similar coordinates in the 'animal noise' plane, and 'hot' / 'cold' might be positive and negative in the temperature plane.
-
-This allows every token to carry much more useful, general information as it heads into the network. They can also be worked with mathematically now that they are in some coordinate system (or 'vector space'). A common example used is `King - Man + Woman = Queen`.
-
-## Residual Pathway
-
-The embeddings are directly connected to the output predictions in a kind of superhighway through the network. Every other part of the model branches off from that stream of data, does whatever it does, then adds its output back into the stream. This is considered important as it prevents the original meaning of the tokens getting 'watered down' and lost as it flows through the network, as was the case with the original RNNs.
-
-It also allows the branched parts to be considered, both logically and mathematically, as independent modules (again, see the Neel Nanda walkthrough above for an awesome dive into this).
-
-## Attention
-
-One of the the key innovations in transformer models was the addition of [multi head attention](https://towardsdatascience.com/transformers-explained-visually-part-3-multi-head-attention-deep-dive-1c1ff1024853).
-
-These modules are the parts that analyse the relationships between tokens in a sequence. Each head in a multi-head layer might be focussing on a different kinds of information, for example various grammatical or semantic relationships. They can work in parallel, greatly speeding up training. Heads in layers further down the residual pathway might use information about relationships calculated and added in by earlier layers to make higher level associations.
-
-> Note the heavy use of 'might' and 'could' etc here - as mentioned earlier, exactly how they perform their calculations isn't clear or necessarily even consistent, but this is a decent starting intuition.
-
-They achieve this by once again embedding the input values branched from the residual stream, in fact three more times, to get values referred to as the `keys`, `queries` and `values`.
-
-The `key` indicates what a token represents in the relationship being examined, the `query` represents what it is interested in. and the `value` is its data. Each token's `query` is compared to every other token's `key` to get their 'attention scores' and depending on how close they are a proportional amount of that tokens `value` is emitted as the output.
-
-Once this process of information swapping is complete, the output of all the heads in a layer are concatenated and fed through a traditional fully connected neural net, or [Multi Layer Perceptron](https://en.wikipedia.org/wiki/Multilayer_perceptron), which is simple a linear combination (i.e. weighted multiplication) of all the input values which is then fed through some kind of non-linear [activation function](https://towardsdatascience.com/activation-functions-neural-networks-1cbd9f8d91d6) to get the output values. It allows the model to in effect do some computation on the combined relationship information produced from the attention heads.
-
-The output from the MLP is then added back in to the residual stream.
-
 ## Training
 
-If you aren't familiar with neural networks or the concept of 'back propagation' you might be wondering how exactly all the embeddings are created to capture these abstract meanings, and how the MLP knows what calculations to do with the head outputs.
+If you aren't familiar with neural networks or the concept of '[back propagation](https://www.youtube.com/watch?v=VMj-3S1tku0&list=PLAqhIrjkxbuWI23v9cThsA9GvCAUhRvKZ&index=1&t=1939s&ab_channel=AndrejKarpathy)' you might be wondering how exactly all the embeddings are created to capture these abstract meanings, and how the MLP knows what calculations to do with the head outputs.
 
 The answer is, at least initially, they dont. They are completely random (perhaps initialised within some given bounds).
 
-When the outputs are generated (with predictably poor results), the output layer looks at how positively or negatively the nodes in the previous layer contributed. This layer does the same to the one before and so on, all the way back to the input.
+When the output predictions are generated (with predictably poor results), the output layer looks at how positively or negatively the nodes in the previous layer contributed to its decision. This layer does the same to the one before and so on, all the way back to the input.
 
 You might imagine it like a bunch of cogs [joined together in a chain](https://en.wikipedia.org/wiki/Chain_rule). If you know the number of teeth on each cog, you can work out how much turning the last in the chain will affect the first.
 
 Once you know this you can nudge each node a little in the appropriate direction to improve performance a tiny bit. Repeat this over and over, and eventually (providing your data has the information available) the model will hopefully gradually tune itself to solve the problem.
 
-## Evaluation
 
+## Generation
+
+Once we have trained our network, we hope that given a starting sequence, it can predict the next token. If we feed that output sequence back in to the model, we get the next token and so on. We can repeat this to get any length sequence, however our model input length will be capped at the number of input tokens we chose when we designed the model so if our sequence exceeds this length we will need to truncate the oldest tokens.
+
+A fun subjective test was to take the intro from a song that the model hadn't seen and ask it to continue it.
 
 # Transformer Memory
 
 ## Short-term (XL) memory
+
+
 
 ## Long-term (KNN) memory
 
