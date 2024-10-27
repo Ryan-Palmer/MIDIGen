@@ -251,7 +251,7 @@ Doing this allows the model to incorporate information from the previous context
 
 ![alt text](image-2.png)
 
-## Long-term (k nearest neighbours / KNN) memory
+## Long-term (k-nearest-neighbours / KNN) memory
 
 The second modification if to actually have a database of *all* previous keys and values. This allows the model to find the top `k` most relevant keys for its current queries, incorporating values from any part of the past sequence. This is only used on a single layer near the output of the model.
 
@@ -285,7 +285,7 @@ A better approach, although much more complicated to implement, is keeping each 
 
 Whenever a sequence in a given batch dimension finishes, we clear both the short and long term memory for that batch dimension otherwise the model would be incorporating memories from a completely unrelated sequence.
 
-## Data location (In memory vs on disk and GPU vs CPU)
+## Data location
 
 Depending on where we store our data (and Faiss vector index), it will be faster or slower to access.
 
