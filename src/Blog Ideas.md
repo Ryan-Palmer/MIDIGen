@@ -258,7 +258,7 @@ Doing this allows the model to incorporate information from the previous context
 
 ## Long-term (k-nearest-neighbours / KNN) memory
 
-The second modification if to actually have a database of *all* previous keys and values. This allows the model to find the top `k` most relevant keys for its current queries, incorporating values from any part of the past sequence. This is only used on a single layer near the output of the model.
+The second modification is to actually have a database of *all* previous keys and values. This allows the model to find the top `k` most relevant keys for its current queries, incorporating values from any part of the past sequence. This is only used on a single layer near the output of the model.
 
 The vector index which allows looking up the most similar keys is [Faiss](https://faiss.ai/) from Meta. It can be used completely on the GPU which makes it super fast.
 
