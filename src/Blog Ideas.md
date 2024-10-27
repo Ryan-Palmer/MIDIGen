@@ -231,16 +231,26 @@ Once you know this you can nudge each node a little in the appropriate direction
 
 Once we have trained our network, we hope that given a starting sequence, it can predict the next token. If we feed that output sequence back in to the model, we get the next token and so on. We can repeat this to get any length sequence, however our model input length will be capped at the number of input tokens we chose when we designed the model so if our sequence exceeds this length we will need to truncate the oldest tokens.
 
-A fun subjective test was to take the intro from a song that the model hadn't seen and ask it to continue it.
+A fun subjective test was to take the intro from a song that the model hadn't seen and ask it to continue it. Even with the relatively small video game data set, this showed some promise and would often generate quite musical and suitable passages. One thing that was apparent however was that once tokens had moved outside the context window, they would be forgotten. This prevents incorporation of longer themes and refrains in the music and prevents the model really getting the overall essence of the piece.
+
 
 # Transformer Memory
 
+In order to help address this lack of long term context, I incorporated some modifications developed in [Memorizing Transformers](https://arxiv.org/abs/2203.08913) and demonstrated in the [Coding a Paper](https://www.youtube.com/playlist?list=PLam9sigHPGwOe8VDoS_6VT4jjlgs9Uepb) series.
+
 ## Short-term (XL) memory
 
+The first is the addition of a kind of short term memory, similar in nature to those used in RNNs but without the need to feed tokens in one at a time.
 
+The implementation is super simple - just save the keys and values from the previous iteration and allow the model to match the current iteration's queries against them in addition to its own. We apply this to every layer of the model.
 
-## Long-term (KNN) memory
+Doing this allows the model to incorporate information from the previous context block, which itself may have incorporated info from the one before and so on. It's a bit like a delay line, allowing information to 'echo' through time and gradually fade out.
 
+## Long-term (k nearest neighbours / KNN) memory
+
+The second modification if to actually have a database of *all* previous keys and values. This allows the model to look at the `k` most relevant context blocks and match them against its queries, incorporating information from any part of the past sequence. This is only used on a single layer near the output of the model.
+
+The vector index which allows looking up the most similar keys is [Faiss](https://faiss.ai/) from Meta. It can be used completely on the GPU which makes it super fast.
 
 # Batches
 
