@@ -14,7 +14,7 @@ We will look at topics such as
 I am going to try to keep it quite high level, but for those interested in taking a look under the covers and digging through code you can [grab the workbooks from my Github](https://github.com/Ryan-Palmer/MIDIGen).
 
 ## Motivation / History
-In 2013 I wrote my [university dissertation](https://1drv.ms/b/c/91fc7a2609794446/EUZEeQkmevwggJEZBQAAAAABtwH2qjO3hw2U96w6LA3Ytw?e=p5ilV1) on the topic of generative music. This culminated in a [prototype instrument](https://www.youtube.com/watch?v=J-LFz0P3Uto&t=89s&ab_channel=RyanPalmer), coded first in MaxMSP and then Python, which captured statistics about a performance and then generated more music in the same style.
+In 2013 I wrote my [university dissertation](https://1drv.ms/b/c/91fc7a2609794446/EUZEeQkmevwggJEZBQAAAAABtwH2qjO3hw2U96w6LA3Ytw?e=p5ilV1) on the topic of generative music. This culminated in a [prototype instrument](https://www.youtube.com/watch?v=J-LFz0P3Uto&t=89s&ab_channel=RyanPalmer), coded first in [MaxMSP](https://cycling74.com/) and then [Python](https://www.python.org/), which captured statistics about a performance and then generated more music in the same style.
 
 At the time, machine learning and artificial intelligence were terms more often discussed in academia or even sci-fi rather than business or software circles. Fast forward 10 years and the world looks rather different. We are witnessing an explosion of technology and ideas which are at once exciting and fascinating is the possibilities they unlock, and also often overwhelming or worrying for the change they will bring.
 
@@ -34,7 +34,7 @@ The data and its associated file format(s) effectively represent a digital music
 
 Its longevity and popularity make MIDI an ideal source of data for a machine learning project. Also, unlike audio data, the score for a piece of music takes up a relatively tiny space and so much more can be loaded into memory and processed quickly. They mostly comprise of note on / off events and performance information (e.g pitchbend) along with some metadata describing things such as instrument choice and tempo.
 
-There are lots of great sources of MIDI files if you [look around on the internet](https://github.com/albertmeronyo/awesome-midi-sources). I began with a relatively small set of [video game](https://www.vgmusic.com/) music and eventually worked with the entire [Lakh MIDI Dataset](https://colinraffel.com/projects/lmd/) which comprises around 200,000 songs in almost every style you can imagine.
+There are lots of great sources of MIDI files if you [look around on the internet](https://github.com/albertmeronyo/awesome-midi-sources). I began with a relatively small set of [video game](https://www.vgmusic.com/) music and eventually worked with the entire [Lakh MIDI Dataset](https://colinraffel.com/projects/lmd/) which comprises around **200,000** songs in almost every style you can imagine.
 
 ## Tools to load and visualise
 
@@ -42,13 +42,15 @@ There are some great libraries available for loading and working with MIDI files
 
 This project mainly uses [Music21](https://www.music21.org/music21docs/about/what.html) which is very mature and fully featured. It allows you to load and save MIDI files, inspecting and changing their contents in its high level 'Stream' format.
 
-It also works well with [MuseScore](https://musescore.org/en) to render a piano-roll timeline or classical notation in the output cells of your [Jupyter Notebook](https://jupyter.org/). I used notebooks throughout this project to interleave code, output and thoughts / documentation (albeit via the [VSCode](https://code.visualstudio.com/) [Polyglot Notebooks extension](https://code.visualstudio.com/docs/languages/polyglot))
+It also works well with [MuseScore](https://musescore.org/en) to render a piano-roll timeline or classical notation in the output cells of your [Jupyter Notebook](https://jupyter.org/). 
 
-Another python library I used is [pretty-midi](https://craffel.github.io/pretty-midi/) which has a great API and works well with [FluidSynth](https://www.fluidsynth.org/)'s synthesis engine to render the scores.
+I used notebooks throughout this project to interleave code, output and thoughts (albeit via the [VSCode](https://code.visualstudio.com/) [Polyglot Notebooks extension](https://code.visualstudio.com/docs/languages/polyglot)). If you haven't experienced notebook programming, I highly recommend giving it a go. The ability to iterate and document as you go allows you to move quickly and experiment with confidence, which is perfect when in exploratory mode.
+
+Another python library I used is [pretty-midi](https://craffel.github.io/pretty-midi/) which has a great API and works well with [FluidSynth](https://www.fluidsynth.org/)'s synthesis engine to render the scores as audio.
 
 ## Encoding / Decoding
 
-The MIDI data can't be fed directly into a machine learning model - at least not the kind we will be looking at. It first needs to be broken up into a series of tokens, which are each assigned a number. For instance, if we assigned `A=1`, `B=2`, `C=3`, `D=4` and `E=5`, then the words `CAB ACE` would be represented as `312 135`.
+MIDI data bytes can't be fed directly into a machine learning model - at least not the kind we will be looking at. It first needs to be broken up into a series of tokens, which are each assigned a number. For instance, if we assigned `A=1`, `B=2`, `C=3`, `D=4` and `E=5`, then the words `CAB ACE` would be represented as `312 135`.
 
 Sounds easy enough - however, as hinted in the intro, this is where using music data rather than text presents its first challenge.
 
@@ -130,39 +132,39 @@ Until this point, generative models such as [Recurrent Neural Networks](https://
 
 Transformers solved these problems by looking at an entire sequence at once, considering the meaning of words and the relationships between them.
 
-I'm not going to try to give an in-depth explanation of transformer models here, as there are already great resources such as the Karpathy, 3Blue1Brown and Statquest channels already linked to at the start. In addition to those resources, I highly recommend checking out Neel Nanda's [Walkthrough of A Mathematical Framework for Transformer Circuits](https://www.youtube.com/watch?v=KV5gbOmHbjU&t=4s&ab_channel=NeelNanda) which gives a great intuition of how information flows through the model.
+I'm not going to try to give an in-depth explanation of transformer models here, as there are already great resources such as the Karpathy, 3Blue1Brown and Statquest channels already linked to at the start. In addition to those, I highly recommend checking out Neel Nanda's [Walkthrough of A Mathematical Framework for Transformer Circuits](https://www.youtube.com/watch?v=KV5gbOmHbjU&t=4s&ab_channel=NeelNanda) which gives a fantastic intuition of how information flows through the model.
 
-I will just try to provide a high level description of what is going on in the context of this project. 
+I will just try to provide a high level description of the model in the context of this project. 
 
-Because we are making a 'next token generator' we are looking at a particular simple flavour of transformer known as 'decoder only'. (as opposed to 'encoder-decoder', which is used for e.g. translation tasks where you want to convert one sequence into another).
+Because we are making a 'next token generator' we are looking at a simple flavour of transformer known as 'decoder only' (as opposed to 'encoder-decoder', which is used for e.g. translation tasks where you want to convert one sequence into another).
 
-> **Disclaimer!!!** I will be making heavy use of analogy and simplified concepts to get the general ideas across, which are definitely *not* rigorous or accurate descriptions of how the models actually work. In fact whilst the architecture and maths involved is remarkably simple, exactly how they create their output is still being researched, for instance in the [Mechanistic Interpretability](https://www.youtube.com/watch?v=veT2VI4vHyU&ab_channel=FAR%E2%80%A4AI) community.
+> **Disclaimer!!!** I will be making heavy use of analogy and simplified concepts to get the general ideas across, which are definitely *not* rigorous or accurate descriptions of how the models actually work. In fact whilst the architecture and maths involved is remarkably simple, exactly how they create their output is still being researched, for instance in the [Mechanistic Interpretability](https://www.youtube.com/watch?v=veT2VI4vHyU&ab_channel=FAR%E2%80%A4AI) community. On top of all that I am a newbie to most of this stuff myself so may get a detail wrong.
 
 ## Token Embeddings
 
-The [embedding layer](https://huggingface.co/blog/getting-started-with-embeddings) is the first part of a traditional transformer. It is where we convert tokens from their single assigned number (or 'index') into a bigger list of numbers which act as coordinates in a high-dimensional semantic space, representing their more general meaning.
+The [embedding layer](https://huggingface.co/blog/getting-started-with-embeddings) is the first part of a traditional transformer. It is where we convert tokens from their single assigned number (or 'index') into a bigger list of numbers. These act as coordinates in a high-dimensional semantic space where their location is supposed to represent their general meaning.
 
-You might expect words that have similar meanings to have similar coordinates, and a word's opposite to be on the negative of it in that particular 'semantic plane'.
+You might therefore expect words that have similar meanings to have similar coordinates, and a word's opposite to be on the negative axis of that particular 'semantic plane'.
 
 For example maybe 'woof' and 'bark' might have similar coordinates in the 'animal noise' plane, and 'hot' / 'cold' might be positive and negative in the temperature plane.
 
-This allows every token to carry much more useful, general information as it heads into the network. They can also be worked with mathematically now that they are in some coordinate system (or 'vector space'). A common example used is `King - Man + Woman = Queen`.
+This allows every token to carry much more useful, general information as it heads into the network. They can also be worked with mathematically now that they are in some coordinate system (or 'vector space'). A common illustrative example is `King - Man + Woman = Queen`.
 
 ## Positional Embeddings
 
-The traditional text transformer architectures usually create another set of embeddings by assigning a position number to each item in the sequence, i.e 1 for the first token, 2 for the second and so on. This allows the model to incorporate information about position. It is reasonable to assume that being the first token in a sequence might be significant for example. 
+The traditional text transformer architectures usually create another set of embeddings by assigning a position number to each item in the sequence, i.e. 1 for the first token, 2 for the second and so on. We then embed these in the same way we did for the token indexes. This allows the model to incorporate information about position. It is reasonable to assume that being the first token in a sequence might be significant for example. 
 
-These positional embeddings are simply added to the token embeddings, combining their 'signals' into one data stream.
+These positional embeddings are simply added to the token embeddings, combining their 'signals' into the data stream.
 
-Because our transformer is musical, we need to change things up a little.
+Because our transformer is *musical* rather than text based, we need to change things up a little.
 
-Firstly, rather than assign a simple static position to each token based on its sequence position, we use [relative positional embeddings](https://www.youtube.com/watch?v=FhL8ksbtiYg&list=PLam9sigHPGwOe8VDoS_6VT4jjlgs9Uepb&index=4&t=1040s&ab_channel=ChrisMcCormickAI). If the token being predicted is assigned 0, the one before it would be 1, and before that 2 etc, allowing us to know how far the tokens are away relative to the current position. The intuition is that closer tokens to the one being predicted are probably more important.
+- Rather than assign a simple static position to each token based on its sequence position, we replace our absolute positions with [relative positional embeddings](https://www.youtube.com/watch?v=FhL8ksbtiYg&list=PLam9sigHPGwOe8VDoS_6VT4jjlgs9Uepb&index=4&t=1040s&ab_channel=ChrisMcCormickAI). In this system, if the token being predicted is for example assigned 0, the one before it would be 1, and before that 2 etc, allowing us to know how far the tokens are away relative to the current position. The intuition is that closer tokens to the one being predicted are probably more important. Perhaps every other token might be of interest, such as with our note / duration token pairs.
 
-Secondly, music has a cyclic counting structure of bars and beats. This is important information to feed to our model if we want it to learn and then generate musical output. To achieve this we take the absolute timestep of every token in the song and divide it by timesteps per beat and per bar to get the values we want to embed and add in.
+- Music has a cyclic structure of bars and beats. This is important information to feed to our model if we want it to learn and then generate musical output. To achieve this we take the absolute timestep of every token in the song and divide it by timesteps per beat, and per bar, to get the values we need. We then embed these bar / beat numbers and add them to the data stream alongside the relative positional embeddings.
 
 ## Residual Pathway
 
-The embeddings are directly connected to the output predictions in a kind of superhighway through the network. Every other part of the model branches off from that stream of data, does whatever it does, then adds its output back into the stream. This is considered important as it prevents the original meaning of the tokens getting 'watered down' and lost as it flows through the network, as was the case with the original RNNs.
+The embeddings are directly connected to the output predictions in a kind of superhighway through the network. Every other part of the model branches off from that stream of data, does whatever it does, then adds its output back into the stream. This is considered important as it prevents the original meaning of the tokens getting lost as it flows through the network.
 
 It also allows the branched parts to be considered, both logically and mathematically, as independent modules (again, see the Neel Nanda walkthrough above for an awesome dive into this).
 
@@ -174,15 +176,15 @@ These modules are the parts that analyse the relationships between tokens in a s
 
 > Note the heavy use of 'might' and 'could' etc here - as mentioned earlier, exactly how they perform their calculations isn't clear or necessarily even consistent, but this is a decent starting intuition.
 
-They achieve this by once again embedding the input values branched from the residual stream, in fact three more times, to get values referred to as the `keys`, `queries` and `values`.
+They achieve this by once again embedding the input values which were branched from the residual stream. In fact they embed them three more times to get values referred to as the `keys`, `queries` and `values`.
 
 The `key` indicates what a token represents in the relationship being examined, the `query` represents what it is interested in. and the `value` is its data. Each token's `query` is compared to every other token's `key` to get their 'attention scores' and depending on how close they are a proportional amount of that tokens `value` is emitted as the output.
 
 Because we are creating a next-token predictor, we mask off the keys of future tokens so that the model can't cheat and look ahead. This is in contrast to an encoder-decode transformer which might want to consider a whole sentence when translating a phrase from one language to another.
 
-Once this process of information swapping is complete, the output of all the heads in a layer are concatenated and fed through a traditional fully connected neural net, or [Multi Layer Perceptron](https://en.wikipedia.org/wiki/Multilayer_perceptron), which is simple a linear combination (i.e. weighted multiplication) of all the input values which is then fed through some kind of non-linear [activation function](https://towardsdatascience.com/activation-functions-neural-networks-1cbd9f8d91d6) to get the output values. It allows the model to in effect do some computation on the combined relationship information produced from the attention heads.
+Once this process of information swapping between tokens is complete, the output of all the heads in a layer are concatenated and fed through a traditional fully connected neural net, or [Multi Layer Perceptron](https://en.wikipedia.org/wiki/Multilayer_perceptron), which is a simple weighted multiplication (or 'linear combination') of all the input values which fed through some kind of [activation function](https://towardsdatascience.com/activation-functions-neural-networks-1cbd9f8d91d6) (or 'non-linearity') to get the output values. It allows the model to in effect do some computation on the combined relationship information produced from the attention heads.
 
-The output from the MLP is then added back in to the residual stream.
+The output from the MLP is then added back in to the residual stream, contributing its calculations to the superhighway of data for use both by later layers and directly in the output predictions if useful.
 
 ![Diagram of a simple transformer model from A Mathematical Framework for Transformer Circuits](image.png)
 #### Diagram of a simple transformer model from [A Mathematical Framework for Transformer Circuits](https://transformer-circuits.pub/2021/framework/index.html).
@@ -190,9 +192,9 @@ The output from the MLP is then added back in to the residual stream.
 
 ## Measuring performance
 
-Just like in essence a model like GPT-2 is a 'next word predictor', so we are building a 'next note predictor'. We are going to feed in a sequence of tokens and as the computer to predict what comes next, and we need a way to judge how well it has done.
+Just as in essence a GPT-2-like model is a 'next word predictor', we are building a 'next note predictor'. We are going to feed in a sequence of tokens and ask the computer to predict what comes next. We therefore need a way to score how well it has done.
 
-To calculate how good a set of predictions is, you could multiply the probabilities assigned to the correct characters. However, because each value is between 0 and 1, multiplying them together very quickly results in a tiny number which is hard for a computer to represent and not very nice to work with.
+To calculate how good a set of predictions is, you could multiply the probabilities the model assigned to the correct tokens. However, because each value is between 0 and 1, multiplying them together very quickly results in a tiny number which is hard for a computer to represent and not very nice to work with.
 
 For this reason, it is common to take the [log](https://www.mathsisfun.com/algebra/exponents-logarithms.html) of the probablility, known as the **log likelyhood**. This has two benefits:
 
@@ -217,7 +219,7 @@ During training, we are asking the model to guess the next tokens for each seque
 
 ## Training
 
-If you aren't familiar with neural networks or the concept of '[back propagation](https://www.youtube.com/watch?v=VMj-3S1tku0&list=PLAqhIrjkxbuWI23v9cThsA9GvCAUhRvKZ&index=1&t=1939s&ab_channel=AndrejKarpathy)' you might be wondering how exactly all the embeddings are created to capture these abstract meanings, and how the MLP knows what calculations to do with the head outputs.
+If you aren't familiar with neural networks or the concept of '[back propagation](https://www.youtube.com/watch?v=VMj-3S1tku0&list=PLAqhIrjkxbuWI23v9cThsA9GvCAUhRvKZ&index=1&t=1939s&ab_channel=AndrejKarpathy)' you might be wondering how exactly all the embeddings are created to capture these abstract meanings and how the MLP knows what calculations to do with the head outputs.
 
 The answer is, at least initially, they dont. They are completely random (perhaps initialised within some given bounds).
 
@@ -230,7 +232,7 @@ Once you know this you can nudge each node a little in the appropriate direction
 
 ## Generation
 
-Once we have trained our network, we hope that given a starting sequence, it can predict the next token. If we feed that output sequence back in to the model, we get the next token and so on. We can repeat this to get any length sequence, however our model input length will be capped at the number of input tokens we chose when we designed the model so if our sequence exceeds this length we will need to truncate the oldest tokens.
+Once we have trained our network, we hope that given a starting sequence it can reliably predict the next token. If we feed that output sequence back in to the model, we get the *next* token and so on. We can repeat this to get any length of sequence. Our model input length however is capped at the length we chose when we selecting its parameters, so if our generated sequence exceeds this we will need to truncate the oldest tokens.
 
 A fun subjective test was to take the intro from a song that the model hadn't seen and ask it to continue it. Even with the relatively small video game data set, this showed some promise and would often generate quite musical and suitable passages. One thing that was apparent however was that once tokens had moved outside the context window, they would be forgotten. This prevents incorporation of longer themes and refrains in the music and prevents the model really getting the overall essence of the piece.
 
@@ -243,13 +245,15 @@ In order to help address this lack of long term context, I incorporated some mod
 
 The first is the addition of a kind of short term memory, similar in nature to those used in RNNs but without the need to feed tokens in one at a time.
 
-The implementation is super simple - just save the keys and values from the previous iteration and allow the model to match the current iteration's queries against them in addition to its own. We apply this to every layer of the model.
+The implementation is super simple - just save the keys and values from the previous iteration and allow the model to match the current iteration's queries against them and use their information in addition to its own. We apply this to every layer of the model.
 
 Doing this allows the model to incorporate information from the previous context block, which itself may have incorporated info from the one before and so on. It's a bit like a delay line, allowing information to 'echo' through time and gradually fade out.
 
+![alt text](image-2.png)
+
 ## Long-term (k nearest neighbours / KNN) memory
 
-The second modification if to actually have a database of *all* previous keys and values. This allows the model to look at the `k` most relevant context blocks and match them against its queries, incorporating information from any part of the past sequence. This is only used on a single layer near the output of the model.
+The second modification if to actually have a database of *all* previous keys and values. This allows the model to find the top `k` most relevant keys for its current queries, incorporating values from any part of the past sequence. This is only used on a single layer near the output of the model.
 
 The vector index which allows looking up the most similar keys is [Faiss](https://faiss.ai/) from Meta. It can be used completely on the GPU which makes it super fast.
 
@@ -271,7 +275,7 @@ The simplest way is to simply concatenate all of them and randomly pick context-
 
 The assumption when randomly sampling from the entire dataset is that each iteration is unconnected to the previous. This is true in our vanilla transformer, but now that we have added memory we need the context chunks for a given song to be in order.
 
-A naive approach would be just to chunk each song into conhtext sized blocks. The problem is that songs can be any length, so if we are doing song-per-batch-dimension then we need to either cop all to the shortest in the batch or pad all songs to the length of the longest with useless tokens.
+A naive approach would be just to chunk each song into context sized blocks. The problem is that songs can be any length, so if we are doing song-per-batch-dimension then we need to either crop all songs to the length of the shortest in the batch or pad all songs to the length of the longest with useless tokens.
 
 ### Contiguous batches
 
@@ -298,9 +302,9 @@ The slowest place to keep it is on disk in a memory-mapped file. This is bound t
 
 The primary goal of this project was to explore the current machine learning landscape in a practical manner, putting to work all the things I had learnt from the books and videos I had been voraciously consuming. Given I have only covered a fraction of the things I learnt in this blog, I think that went pretty well!
 
-Building something is obviously a much slower process than reading or watching a guide so it is a learning techique I resort to less often when trying to cram on a subject, but it is a much deeper and more involved experience which I find activates my brain in a completely different way. Actively asking questions and exploring ideas rather than having them fed in forces me to really understand what is going on. 
+Building something is obviously a much slower process than reading or watching a guide so it is a learning techique I resort to less often when trying to cram a subject, but it is a much deeper and more involved experience which I find activates my brain in a completely different way. Actively asking questions and exploring ideas rather than having them fed in forces me to really understand what is going on. 
 
-Despite not using Python for over a decade, with a little help from Github Copilot I was able to make rapid progress. Pytorch with einops in particular was really intuitive and fun to work with and I think anyone with a little programming knowledge would find them easy to pick up.
+Despite not using Python for over a decade, with a little help from Github Copilot I was able to make rapid progress. [Pytorch](https://pytorch.org/) with [einops](https://github.com/arogozhnikov/einops) in particular was really intuitive and fun to work with and I think anyone with a little programming knowledge would find them easy to pick up.
 
 I have a [repo with the bare dev container](https://github.com/Ryan-Palmer/PyTorch-DevContainer) which you can use to spin up a fully configured Python / Pytorch environment if you would like to take it for a spin.
 
@@ -316,12 +320,12 @@ I think it is fair to say it didn't approach a consistency that would allow it t
 
 ## Next Steps
 
-The very next thing I will do is consolidate and refactor the code for the model as it is, replacing as much of the hand coded stuff with off-the-shelf solutions which are well tested and optimised. The aim here is to get hands on and learn, not to get caught up trying to build a framework, and if we want to explore further it is going to be important to have a solid foundation.
+The very next thing to do is consolidate and refactor the code for the model as it is, replacing as much of the hand coded stuff with off-the-shelf solutions which are well tested and optimised. The aim here is to get hands on and learn, not to get caught up trying to build a framework, and if we want to explore further it is going to be important to have a solid foundation.
 
 I will likely use the [MIDITok](https://miditok.readthedocs.io/en/latest/tokenizations.html) tokeniser and code from [lucidrain's x-transformers](https://github.com/lucidrains/x-transformers) repo for the model.
 
-Following that, I will experiment with incorporating other kinds of musical information into the data. For example, the model has 128 tokens for notes, but it doesn't have any explicit way to understand that a low C and a high C are the same note an octave apart. There are many music theory based metrics that could be provided. Which of these might help and which would just clutter the input and would be better off discovered through training, isn't clear. 
+Following that, I will experiment with incorporating other kinds of musical information into the data. For example, the model has 128 tokens for notes, but it doesn't have any explicit way to understand that a low C and a high C are the same note an octave apart. There are many music theory based metrics that could be provided. Which of these might help and which would just clutter the input and would be better off discovered through training isn't clear.
 
-This time around I did attempt a form of [byte pair encoding](https://www.youtube.com/watch?v=zduSFxRajkE&list=PLAqhIrjkxbuWI23v9cThsA9GvCAUhRvKZ&index=9&t=104s&ab_channel=AndrejKarpathy) wherby you chunk tokens together, merging their meanings into a new single dedicated token. I was however limited by the way I had encoded bars and beats which prevented me from merging tokens across timesteps. If I use the MIDITok encoder I think I can avoid this and properly byte pair encode. This, configured correctly and combined with a large and well curated dataset, should in theory trade vocabulary size, and therefore output prediction classes, for richer meaning per token and the ability to cram more meaning into a given fixed context window (since one token now represents multiple).
+This time around I did attempt a form of [byte pair encoding](https://www.youtube.com/watch?v=zduSFxRajkE&list=PLAqhIrjkxbuWI23v9cThsA9GvCAUhRvKZ&index=9&t=104s&ab_channel=AndrejKarpathy) wherby you chunk tokens together, merging their meanings into a new single dedicated token. I was however limited by the way I had encoded bars and beats which prevented me from merging tokens across timesteps. If I use the MIDITok encoder I think I can avoid this and properly byte pair encode. This, configured correctly and combined with a large and well curated dataset, should in theory trade vocabulary size (and therefore number of output prediction classes) for richer meaning per token and the ability to cram more meaning into a given fixed context window (since one token now represents multiple).
 
-Longer term, I would love to examine actual audio analysis rather than simply MIDI. This comes with a whole new bunch of challenges and approaches. Ultimately the two could be combined to 'listen' to audio and then generate the appropriate MIDI or vice versa. I for one would love a robot band to jam with in my bedroom!
+Longer term, I would love to examine actual audio analysis rather than simply MIDI. This comes with a whole new bunch of challenges and techniques to learn. Ultimately the two approaches could be combined to analyse audio and generate MIDI or vice versa. I for one would love a robot band to jam with in my bedroom!
