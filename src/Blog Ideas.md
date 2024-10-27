@@ -117,6 +117,8 @@ These tokens are each assigned a number and that's it, our data is encoded and r
 
 To decode the data we just follow the reverse of this process, turning tokens into positions and positions into a sparse score before finally converting the sparse score into MIDI.
 
+> Python's single threaded execution made this painfully slow once I moved to larger datasets, but I discovered the [multiprocessing](https://docs.python.org/3/library/multiprocessing.html) module which allowed me to encode in parallel, massively speeding things up.
+
 # Model
 
 Transformers are a particular class of machine learning model first introduced by Google in their landmark [Attention is all you Need](https://en.wikipedia.org/wiki/Attention_Is_All_You_Need) paper in 2017. 
@@ -254,20 +256,41 @@ The vector index which allows looking up the most similar keys is [Faiss](https:
 
 # Batches
 
-## One long seq vs per-song vs contiguous
+So, we now know where we are getting the data from, how we will encode it and the architecture of our model.
+
+A question yet to be addressed is how we will assemble the data, where we will put it and how we will feed it into the model. It might not be obvious but these are questions which fundamentally determine how fast our model can train and even what kinds of models we can design.
+
+## Grouping songs
+
+We want to feed lots of chunks of lots of songs in to our model at once, so how do we select and arrange these chunks?
+
+### Single sequence
+
+The simplest way is to simply concatenate all of them and randomly pick context-sized chunks from this super-long sequence. This is easy to implement and means the model should see a wide distribution of samples from the dataset however long you train it for, rather than having to work its way through whole songs at a time.
+
+### Sequence per song
+
+The assumption when randomly sampling from the entire dataset is that each iteration is unconnected to the previous. This is true in our vanilla transformer, but now that we have added memory we need the context chunks for a given song to be in order.
+
+A naive approach would be just to chunk each song into conhtext sized blocks. The problem is that songs can be any length, so if we are doing song-per-batch-dimension then we need to either cop all to the shortest in the batch or pad all songs to the length of the longest with useless tokens.
+
+### Contiguous batches
+
+A better approach, although much more complicated to implement, is keeping each song in a single batch dimension and in order, but appending another song when it finishes. This means the start and stop tokens for each sequence are staggered rather than aligned across matches.
+
+![alt text](image-1.png)
+
+Whenever a sequence in a given batch dimension finshes, we clear both the short and long term memory for that batch dimension otherwise the model would be incorporating memories from a completely unrelated sequence.
 
 ## Data location (In memory vs on disk and GPU vs CPU)
 
-## Multi-threaded encoding
+Depending on where we store our data (and Faiss vector index), it will be faster or slower to access.
 
+The fastest place to have them is in GPU memory, as this is logically very close to the GPU.
 
-# Byte Pair / Action Encoding
+The next best place is in CPU memory. This is often very fast but it takes time to push it on to the GPU when needed.
 
-## Motivation
-
-## Challenges (time dimension)
-
-## Findings
+The slowest place to keep it is on disk in a memory-mapped file. This is bound to work at roughly the speed of your disk I/O.
 
 
 # Training
