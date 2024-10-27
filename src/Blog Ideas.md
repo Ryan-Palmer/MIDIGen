@@ -160,7 +160,9 @@ Transformers solved these problems by looking at an entire sequence at once, con
 
 I'm not going to try to give an in-depth explanation of transformer models here, as there are already great resources such as the Karpathy, 3Blue1Brown and Statquest channels already linked to at the start. In addition to those resources, I highly recommend checking out Neel Nanda's [Walkthrough of A Mathematical Framework for Transformer Circuits](https://www.youtube.com/watch?v=KV5gbOmHbjU&t=4s&ab_channel=NeelNanda) which gives a great intuition of how information flows through the model.
 
-I will focus on giving a high level description of what is going on and how it relates to this project.
+I will just try to provide a high level description of what is going on in the context of this project. 
+
+Because we are making a 'next token generator' we are looking at a particular simple flavour of transformer known as 'decoder only'. (as opposed to 'encoder-decoder', which is used for e.g. translation tasks where you want to convert one sequence into another).
 
 **Disclaimer!!!** I will be making heavy use of analogy and simplified concepts to get the general ideas across, which are definitely *not* rigorous or accurate descriptions of how the models actually work. In fact whilst the architecture and maths involved is remarkably simple, exactly how they create their output is still being researched, for instance in the Mechanistic Interpretability community.
 
@@ -174,9 +176,39 @@ For example maybe 'woof' and 'bark' might have similar coordinates in the 'anima
 
 This allows every token to carry much more useful, general information as it heads into the network. They can also be worked with mathematically now that they are in some coordinate system (or 'vector space'). A common example used is `King - Man + Woman = Queen`.
 
+## Residual Pathway
+
+The embeddings are directly connected to the output predictions in a kind of superhighway through the network. Every other part of the model branches off from that stream of data, does whatever it does, then adds its output back into the stream. This is considered important as it prevents the original meaning of the tokens getting 'watered down' and lost as it flows through the network, as was the case with the original RNNs.
+
+It also allows the branched parts to be considered, both logically and mathematically, as independent modules (again, see the Neel Nanda walkthrough above for an awesome dive into this).
+
 ## Attention
 
+One of the the key innovations in transformer models was the addition of [multi head attention](https://towardsdatascience.com/transformers-explained-visually-part-3-multi-head-attention-deep-dive-1c1ff1024853).
 
+These modules are the parts that analyse the relationships between tokens in a sequence. Each head in a multi-head layer might be focussing on a different kinds of information, for example various grammatical or semantic relationships. They can work in parallel, greatly speeding up training. Heads in layers further down the residual pathway might use information about relationships calculated and added in by earlier layers to make higher level associations.
+
+> Note the heavy use of 'might' and 'could' etc here - as mentioned earlier, exactly how they perform their calculations isn't clear or necessarily even consistent, but this is a decent starting intuition.
+
+They achieve this by once again embedding the input values branched from the residual stream, in fact three more times, to get values referred to as the `keys`, `queries` and `values`.
+
+The `key` indicates what a token represents in the relationship being examined, the `query` represents what it is interested in. and the `value` is its data. Each token's `query` is compared to every other token's `key` to get their 'attention scores' and depending on how close they are a proportional amount of that tokens `value` is emitted as the output.
+
+Once this process of information swapping is complete, the output of all the heads in a layer are concatenated and fed through a traditional fully connected neural net, or [Multi Layer Perceptron](https://en.wikipedia.org/wiki/Multilayer_perceptron), which is simple a linear combination (i.e. weighted multiplication) of all the input values which is then fed through some kind of non-linear [activation function](https://towardsdatascience.com/activation-functions-neural-networks-1cbd9f8d91d6) to get the output values. It allows the model to in effect do some computation on the combined relationship information produced from the attention heads.
+
+The output from the MLP is then added back in to the residual stream.
+
+## Training
+
+If you aren't familiar with neural networks or the concept of 'back propagation' you might be wondering how exactly all the embeddings are created to capture these abstract meanings, and how the MLP knows what calculations to do with the head outputs.
+
+The answer is, at least initially, they dont. They are completely random (perhaps initialised within some given bounds).
+
+When the outputs are generated (with predictably poor results), the output layer looks at how positively or negatively the nodes in the previous layer contributed. This layer does the same to the one before and so on, all the way back to the input.
+
+You might imagine it like a bunch of cogs [joined together in a chain](https://en.wikipedia.org/wiki/Chain_rule). If you know the number of teeth on each cog, you can work out how much turning the last in the chain will affect the first.
+
+Once you know this you can nudge each node a little in the appropriate direction to improve performance a tiny bit. Repeat this over and over, and eventually (providing your data has the information available) the model will hopefully gradually tune itself to solve the problem.
 
 ## Evaluation
 
