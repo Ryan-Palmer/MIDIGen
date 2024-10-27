@@ -7,9 +7,8 @@ Although we will use the same tools and techniques, building a 'Chat GPT for mus
 We will look at topics such as
 
 - Translation of raw data into a suitable format for training
-- Efficient encoding / decoding to allow processing of larger data sets
-- Batching, to segment data for the model during training
 - Transformer 'attention' models which have contextual understanding
+- Batching, to segment data for the model during training
 - Adding long term memory to transformers
 
 I am going to try to keep it quite high level, but for those interested in taking a look under the covers and digging through code you can [grab the workbooks from my Github](https://github.com/Ryan-Palmer/MIDIGen).
@@ -280,7 +279,7 @@ A better approach, although much more complicated to implement, is keeping each 
 
 ![alt text](image-1.png)
 
-Whenever a sequence in a given batch dimension finshes, we clear both the short and long term memory for that batch dimension otherwise the model would be incorporating memories from a completely unrelated sequence.
+Whenever a sequence in a given batch dimension finishes, we clear both the short and long term memory for that batch dimension otherwise the model would be incorporating memories from a completely unrelated sequence.
 
 ## Data location (In memory vs on disk and GPU vs CPU)
 
@@ -293,19 +292,36 @@ The next best place is in CPU memory. This is often very fast but it takes time 
 The slowest place to keep it is on disk in a memory-mapped file. This is bound to work at roughly the speed of your disk I/O.
 
 
-# Training
-
-## Training loop
-
-## Monitoring
-
-## Experimenting
-
-
 # Conclusion
 
 ## Learning
 
+The primary goal of this project was to explore the current machine learning landscape in a practical manner, putting to work all the things I had learnt from the books and videos I had been voraciously consuming. Given I have only covered a fraction of the things I learnt in this blog, I think that went pretty well!
+
+Building something is obviously a much slower process than reading or watching a guide so it is a learning techique I resort to less often when trying to cram on a subject, but it is a much deeper and more involved experience which I find activates my brain in a completely different way. Actively asking questions and exploring ideas rather than having them fed in forces me to really understand what is going on. 
+
+Despite not using Python for over a decade, with a little help from Github Copilot I was able to make rapid progress. Pytorch with einops in particular was really intuitive and fun to work with and I think anyone with a little programming knowledge would find them easy to pick up.
+
+I have a [repo with the bare dev container](https://github.com/Ryan-Palmer/PyTorch-DevContainer) which you can use to spin up a fully configured Python / Pytorch environment if you would like to take it for a spin.
+
 ## Music Generation
 
+Addition of the XL and KNN memory certainly improved the subjective performance of the model, with the ability ermging to remember key phrases from outside the context and refer back to them, and keep an idea going for a reasonable amount of time.
+
+The output clearly showed recognition of the bar and beats of the input, creating continuations that followed the same kind of rhythm.
+
+Quite rudimentry harmonic knowledge did seem to be employed, with chords and scales emerging, but how much of this was luck or subjective projection of structure is hard to say.
+
+I think it is fair to say it didn't approach a consistency that would allow it to pass for a real musician, with frequent detours that didn't really work and the tendency to get caught in strange loops. That said, it would usually create something passable and often a genuinely suitable and well structured part. Overall, given it was coded ad-hoc by combining and modifying parts of various guides and examples I was glad it worked at all!
+
 ## Next Steps
+
+The very next thing I will do is consolidate and refactor the code for the model as it is, replacing as much of the hand coded stuff with off-the-shelf solutions which are well tested and optimised. The aim here is to get hands on and learn, not to get caught up trying to build a framework, and if we want to explore further it is going to be important to have a solid foundation.
+
+I will likely use the [MIDITok](https://miditok.readthedocs.io/en/latest/tokenizations.html) tokeniser and code from [lucidrain's x-transformers](https://github.com/lucidrains/x-transformers) repo for the model.
+
+Following that, I will experiment with incorporating other kinds of musical information into the data. For example, the model has 128 tokens for notes, but it doesn't have any explicit way to understand that a low C and a high C are the same note an octave apart. There are many music theory based metrics that could be provided. Which of these might help and which would just clutter the input and would be better off discovered through training, isn't clear. 
+
+This time around I did attempt a form of [byte pair encoding](https://www.youtube.com/watch?v=zduSFxRajkE&list=PLAqhIrjkxbuWI23v9cThsA9GvCAUhRvKZ&index=9&t=104s&ab_channel=AndrejKarpathy) wherby you chunk tokens together, merging their meanings into a new single dedicated token. I was however limited by the way I had encoded bars and beats which prevented me from merging tokens across timesteps. If I use the MIDITok encoder I think I can avoid this and properly byte pair encode. This, configured correctly and combined with a large and well curated dataset, should in theory trade vocabulary size, and therefore output prediction classes, for richer meaning per token and the ability to cram more meaning into a given fixed context window (since one token now represents multiple).
+
+Longer term, I would love to examine actual audio analysis rather than simply MIDI. This comes with a whole new bunch of challenges and approaches. Ultimately the two could be combined to 'listen' to audio and then generate the appropriate MIDI or vice versa. I for one would love a robot band to jam with in my bedroom!
