@@ -2,7 +2,7 @@
 
 In this blog we will explore transformer-based machine learning using music generation rather than the more common text based scenario.
 
-Although we will use the same tools and techniques, building a 'GPT for music' adds a few extra challenges which will keep us on our toes and require thinking outside the box (hint - it has multiple layers and a time dimension!).
+Although we will use the same tools and techniques, building a 'Chat GPT for music' adds a few extra challenges which will keep us on our toes and require thinking outside the box (hint - it has multiple layers and a time dimension!).
 
 We will look at topics such as
 
@@ -61,9 +61,9 @@ The encoding process was therefore a bit more involved. It comprised of three st
 
 1. Sparse Score
 
-Convert the MIDI file into a giant array which held a value for each of the 128 pitches at every step in time (and for every instrument!). The value describes if a note was started for how long (so a zero means 'no note' and a 4 means 'start a note which lasts for 4 steps').
+Convert the MIDI file into a giant array which held a value for each of the 128 pitches at every step in time (and for every instrument!). The value describes if a note was started, and if so for how many timesteps (so a zero means 'no note' and a 4 means 'start a note which lasts for 4 steps').
 
-It is referred to as 'sparse' as it is quite literally nearly empty, as most steps on most instruments are zero.
+It is referred to as 'sparse' as it is quite literally nearly empty, i.e. most steps on most instruments are zero.
 
 For example a single instrument might have
 
@@ -74,7 +74,7 @@ For example a single instrument might have
 //... up to 128 rows
 ```
 
-This example takes 24 values to show
+This short example takes 24 values to show
 
 - Step 1, Pitch 1 = start of a 4-step note
 - Step 2, Pitch 3 = start of a 2-step note
@@ -102,7 +102,7 @@ where `-1` represents a gap before the next note.
 
 Now we just need to flatten all these values into a single list of tokens so we can feed it into our model, just like the text example of `CAB ACE` earlier.
 
-There are all sorts of different encoding schemes you could employ, many of which can be seen on the [MIDITok](https://miditok.readthedocs.io/en/latest/tokenizations.html) website (which I only just discovered!). What they more or less all have in common, including the one I used which was adapted from MusicAutoBot, are
+There are all sorts of different encoding schemes you could employ, many of which can be seen on the [MIDITok](https://miditok.readthedocs.io/en/latest/tokenizations.html) website (which I only just discovered whilst writing this blog!). What they more or less all have in common, including the one I used which was adapted from MusicAutoBot, are
 
 - Tokens for each note (of the 128 available in MIDI)
 - Tokens for each duration (from a single timestep all the way up to whatever limit you set on note length).
@@ -148,9 +148,35 @@ During training, we are asking the model to guess the next tokens for each seque
 
 # Transformers
 
-## Attention
+Transformers are a particular class of machine learning model first introduced by Google in their landmark [Attention is all you Need](https://en.wikipedia.org/wiki/Attention_Is_All_You_Need) paper in 2017. 
+
+Until this point, generative models such as [Recurrent Neural Networks](https://en.wikipedia.org/wiki/Recurrent_neural_network) had two significant problems which limited their practical use.
+
+1. They were restricted in their ability to work with large contexts. That is to say, they quickly forgot things and lost the thread of meaning in a sequence, which limited their practical use. Additions such as [Long Short-Term Memory](https://en.wikipedia.org/wiki/Long_short-term_memory) helped with this to a degree.
+
+2. They had to process tokens in sequence order, which meant they did not parallelise easily and made them slow to train. It also restricted the models to only using *past* tokens to predict the future (although this could be worked around with [Bi-directional RNNS](https://en.wikipedia.org/wiki/Bidirectional_recurrent_neural_networks) for a further performance cost).
+
+Transformers solved these problems by looking at an entire sequence at once, considering the meaning of words and the relationships between them.
+
+I'm not going to try to give an in-depth explanation of transformer models here, as there are already great resources such as the Karpathy, 3Blue1Brown and Statquest channels already linked to at the start. In addition to those resources, I highly recommend checking out Neel Nanda's [Walkthrough of A Mathematical Framework for Transformer Circuits](https://www.youtube.com/watch?v=KV5gbOmHbjU&t=4s&ab_channel=NeelNanda) which gives a great intuition of how information flows through the model.
+
+I will focus on giving a high level description of what is going on and how it relates to this project.
+
+**Disclaimer!!!** I will be making heavy use of analogy and simplified concepts to get the general ideas across, which are definitely *not* rigorous or accurate descriptions of how the models actually work. In fact whilst the architecture and maths involved is remarkably simple, exactly how they create their output is still being researched, for instance in the Mechanistic Interpretability community.
 
 ## Embeddings
+
+The [embedding layer](https://huggingface.co/blog/getting-started-with-embeddings) is the first part of a traditional transformer. It is where we convert tokens from their single assigned number (or 'index') into a bigger list of numbers which act as coordinates in a high-dimensional semantic space, representing their more general meaning.
+
+You might expect words that have similar meanings to have similar coordinates, and a word's opposite to be on the negative of it in that particular 'semantic plane'.
+
+For example maybe 'woof' and 'bark' might have similar coordinates in the 'animal noise' plane, and 'hot' / 'cold' might be positive and negative in the temperature plane.
+
+This allows every token to carry much more useful, general information as it heads into the network. They can also be worked with mathematically now that they are in some coordinate system (or 'vector space'). A common example used is `King - Man + Woman = Queen`.
+
+## Attention
+
+
 
 ## Evaluation
 
