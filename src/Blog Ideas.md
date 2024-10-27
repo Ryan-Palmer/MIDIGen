@@ -46,6 +46,10 @@ It also works well with [MuseScore](https://musescore.org/en) to render a piano-
 
 I used notebooks throughout this project to interleave code, output and thoughts (albeit via the [VSCode](https://code.visualstudio.com/) [Polyglot Notebooks extension](https://code.visualstudio.com/docs/languages/polyglot)). If you haven't experienced notebook programming, I highly recommend giving it a go. The ability to iterate and document as you go allows you to move quickly and experiment with confidence, which is perfect when in exploratory mode.
 
+![alt text](image-4.png)
+#### Example of using notebooks to visualise and listen to code output
+
+
 Another python library I used is [pretty-midi](https://craffel.github.io/pretty-midi/) which has a great API and works well with [FluidSynth](https://www.fluidsynth.org/)'s synthesis engine to render the scores as audio.
 
 ## Encoding / Decoding
