@@ -289,11 +289,11 @@ Whenever a sequence in a given batch dimension finishes, we clear both the short
 
 Depending on where we store our data (and Faiss vector index), it will be faster or slower to access.
 
-The fastest place to have them is in GPU memory, as this is logically very close to the GPU.
+- The fastest place to have them is in GPU memory, as this is logically very close to the GPU.
 
-The next best place is in CPU memory. This is often very fast but it takes time to push it on to the GPU when needed.
+- The next best place is in CPU memory. This is often very fast but it takes time to push it on to the GPU when needed.
 
-The slowest place to keep it is on disk in a memory-mapped file. This is bound to work at roughly the speed of your disk I/O.
+- The slowest place to keep it is on disk in a memory-mapped file. This is bound to work at roughly the speed of your disk I/O.
 
 
 # Conclusion
