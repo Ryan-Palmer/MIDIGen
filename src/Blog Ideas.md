@@ -1,30 +1,27 @@
 # Intro
 
-In this blog we will explore modern machine learning tools and techniques using music generation as a motivation, rather than the more common text based scenario.
+In this blog we will explore transformer-based machine learning using music generation rather than the more common text based scenario.
 
-Although we will use the same tools and techniques, building a 'GPT for music' adds a few extra challenges which will keep us on our toes and require thinking outside the box more than a little (hint - it has multiple layers and a time dimension!).
+Although we will use the same tools and techniques, building a 'GPT for music' adds a few extra challenges which will keep us on our toes and require thinking outside the box (hint - it has multiple layers and a time dimension!).
 
 We will look at topics such as
 
 - Translation of raw data into a suitable format for training
 - Efficient encoding / decoding to allow processing of larger data sets
 - Batching, to segment data for the model during training
-- Attention-based Transformer models which have contextual understanding
+- Transformer 'attention' models which have contextual understanding
+- Adding long term memory to transformers
 
 I am going to try to keep it quite high level, but for those interested in taking a look under the covers and digging through code you can [grab the workbooks from my Github](https://github.com/Ryan-Palmer/MIDIGen).
 
 ## Motivation / History
-If you have followed my [previous blogs](https://www.compositional-it.com/news-blog/author/ryan/) you may have noticed that I have a keen interest in all things machine learning. 
+In 2013 I wrote my [university dissertation](https://1drv.ms/b/c/91fc7a2609794446/EUZEeQkmevwggJEZBQAAAAABtwH2qjO3hw2U96w6LA3Ytw?e=p5ilV1) on the topic of generative music. This culminated in a [prototype instrument](https://www.youtube.com/watch?v=J-LFz0P3Uto&t=89s&ab_channel=RyanPalmer), coded first in MaxMSP and then Python, which captured statistics about a performance and then generated more music in the same style.
 
-This fascination began in 2013 when I wrote my [university dissertation](https://1drv.ms/b/c/91fc7a2609794446/EUZEeQkmevwggJEZBQAAAAABtwH2qjO3hw2U96w6LA3Ytw?e=p5ilV1) on the topic of generative music. This culminated in a [prototype instrument](https://www.youtube.com/watch?v=J-LFz0P3Uto&t=89s&ab_channel=RyanPalmer), coded first in MaxMSP and then Python, which captured statistics about a performance and then generated more music in the same style.
-
-At the time, machine learning and artificial intelligence were terms more often discussed in academia or even sci-fi rather than business or software circles. I was really just a novice programmer naively exploring a thread of ideas from first principles, not really aware of or building upon any previous work. Fast forward 10 years and the world looks rather different. We are witnessing an explosion of technology and ideas which are at once exciting and fascinating is the possibilities they unlock, and also often overwhelming or worrying for the change they will bring.
-
-I am a believer that knowledge is power - if you understand things, you can have a say in them. We all share the responsibility to both educate ourselves and help others climb that ladder, as this gives them more of a voice and will ultimately benefit us all. Most things can be understood by most people if can find a way to see the world from their perspective.
+At the time, machine learning and artificial intelligence were terms more often discussed in academia or even sci-fi rather than business or software circles. Fast forward 10 years and the world looks rather different. We are witnessing an explosion of technology and ideas which are at once exciting and fascinating is the possibilities they unlock, and also often overwhelming or worrying for the change they will bring.
 
 With that in mind I have been racing to catch up and keep up with all of the developments in the ML space which is no mean feat, given the pace of the industry. Having done a lot of cramming with great books such as [Hands on Machine Learning](https://www.oreilly.com/library/view/hands-on-machine-learning/9781098125967/) and excellent video resources such as [Andrej Karpathy](https://www.youtube.com/playlist?list=PLAqhIrjkxbuWI23v9cThsA9GvCAUhRvKZ), [3Blue1Brown](https://www.youtube.com/playlist?list=PLZHQObOWTQDNU6R1_67000Dx_ZCJB-3pi) and [Statquest](https://www.youtube.com/playlist?list=PLblh5JKOoLUICTaGLRoHQDuF_7q2GfuJF)'s channels, I needed a personal project to really embed the knowledge in my mind. What better than picking up where I left off 11 years ago with music generation, but using all of the modern tools and techniques?
 
-And that brings us to this blog! I hope to at the very least highlight all the wonderful people and leave a breadcrumb trail to the resources which helped me along the way. Additionally, I would love to help to de-mystify the topic and show that it really is accessible and understandable to anyone with a curious mind, both technical and non-technical.
+I hope to at least highlight all the wonderful people and leave a breadcrumb trail to the resources which helped me along the way. Additionally, I would love to help to de-mystify the topic and show that it really is accessible and understandable to anyone with a curious mind, both technical and non-technical.
 
 In addition to the resources linked above, this project leant heavily on Andrew Shaw's [MusicAutoBot](https://github.com/bearpelican/musicautobot/tree/master) project and Nick Ryan's [Coding a Paper](https://www.youtube.com/playlist?list=PLam9sigHPGwOe8VDoS_6VT4jjlgs9Uepb) series, which themselves were built upon the shoulders of giants. Thanks guys!
 
@@ -64,7 +61,7 @@ The encoding process was therefore a bit more involved. It comprised of three st
 
 1. Sparse Score
 
-Convert the MIDI file into a giant array which held a value for every pitch at every step in time (and for every instrument!). The value describes if a note was started for how long (so a zero means 'no note' and a 4 means 'start a note which lasts for 4 steps').
+Convert the MIDI file into a giant array which held a value for each of the 128 pitches at every step in time (and for every instrument!). The value describes if a note was started for how long (so a zero means 'no note' and a 4 means 'start a note which lasts for 4 steps').
 
 It is referred to as 'sparse' as it is quite literally nearly empty, as most steps on most instruments are zero.
 
@@ -77,7 +74,7 @@ For example a single instrument might have
 //... up to 128 rows
 ```
 
-This takes 24 values to show
+This example takes 24 values to show
 
 - Step 1, Pitch 1 = start of a 4-step note
 - Step 2, Pitch 3 = start of a 2-step note
@@ -146,7 +143,7 @@ Since the reverse of the log function is exponentiation (see the article linked 
 
 During training, we are asking the model to guess the next tokens for each sequence in the batch. Of course, we know the answer, so the loss is simply a measure of how confident it was in the correct token vs the others. This is known as [cross entropy](https://en.wikipedia.org/wiki/Cross-entropy#Cross-entropy_loss_function_and_logistic_regression).
 
-> I just found [this](https://www.naukri.com/code360/library/softmax-and-cross-entropy) article which nicely restates much of the above in more detail with examples, as the Wikipedia articles are a bit intense for the uninitiated! Also check out [this Statquest](https://www.youtube.com/watch?v=6ArSys5qHAU&ab_channel=StatQuestwithJoshStarmer). For a closer look at the close relationship between negative log likelyhood and cross entropy loss, [this is a great reference](https://towardsdatascience.com/cross-entropy-negative-log-likelihood-and-all-that-jazz-47a95bd2e81).
+> I found [this](https://www.naukri.com/code360/library/softmax-and-cross-entropy) article which nicely restates much of the above in more detail with examples, as the Wikipedia articles are a bit intense for the uninitiated! Also check out [this Statquest](https://www.youtube.com/watch?v=6ArSys5qHAU&ab_channel=StatQuestwithJoshStarmer). For a nice explanation of the close relationship between negative log likelyhood and cross entropy loss, [this is a great reference](https://towardsdatascience.com/cross-entropy-negative-log-likelihood-and-all-that-jazz-47a95bd2e81).
 
 
 # Transformers
@@ -160,9 +157,9 @@ During training, we are asking the model to guess the next tokens for each seque
 
 # Transformer Memory
 
-## Recurrent (XL) memory
+## Short-term (XL) memory
 
-## RAG (KNN) memory
+## Long-term (KNN) memory
 
 
 # Batches
