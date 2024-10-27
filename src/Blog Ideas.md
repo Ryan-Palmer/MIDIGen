@@ -44,13 +44,13 @@ This project mainly uses [Music21](https://www.music21.org/music21docs/about/wha
 
 It also works well with [MuseScore](https://musescore.org/en) to render a piano-roll timeline or classical notation in the output cells of your [Jupyter Notebook](https://jupyter.org/). 
 
+Another python library I used is [pretty-midi](https://craffel.github.io/pretty-midi/) which has a great API and works well with [FluidSynth](https://www.fluidsynth.org/)'s synthesis engine to render the scores as audio.
+
 I used notebooks throughout this project to interleave code, output and thoughts (albeit via the [VSCode](https://code.visualstudio.com/) [Polyglot Notebooks extension](https://code.visualstudio.com/docs/languages/polyglot)). If you haven't experienced notebook programming, I highly recommend giving it a go. The ability to iterate and document as you go allows you to move quickly and experiment with confidence, which is perfect when in exploratory mode.
 
 ![alt text](image-4.png)
-#### Example of using notebooks to visualise and listen to code output
 
-
-Another python library I used is [pretty-midi](https://craffel.github.io/pretty-midi/) which has a great API and works well with [FluidSynth](https://www.fluidsynth.org/)'s synthesis engine to render the scores as audio.
+Example of using notebooks to visualise and listen to code output
 
 ## Encoding / Decoding
 
@@ -191,7 +191,8 @@ Once this process of information swapping between tokens is complete, the output
 The output from the MLP is then added back in to the residual stream, contributing its calculations to the superhighway of data for use both by later layers and directly in the output predictions if useful.
 
 ![Diagram of a simple transformer model from A Mathematical Framework for Transformer Circuits](image.png)
-#### Diagram of a simple transformer model from [A Mathematical Framework for Transformer Circuits](https://transformer-circuits.pub/2021/framework/index.html).
+
+Diagram of a simple transformer model from [A Mathematical Framework for Transformer Circuits](https://transformer-circuits.pub/2021/framework/index.html).
 
 
 ## Measuring performance
