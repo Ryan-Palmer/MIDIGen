@@ -284,7 +284,7 @@ A naive approach would be just to chunk each song into context sized blocks. The
 
 ### Contiguous batches
 
-A better approach, although much more complicated to implement, is keeping each song in a single batch dimension and in order, but appending another song when it finishes. This means the start and stop tokens for each sequence are staggered rather than aligned across matches.
+A better approach, although much more complicated to implement, is keeping each song in a single batch dimension and in order, but appending another song when it finishes. This means the start and stop tokens for each sequence are staggered rather than aligned across batch dimensions.
 
 ![alt text](image-1.png)
 
