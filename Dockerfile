@@ -1,10 +1,12 @@
-FROM pytorch/pytorch:2.3.1-cuda12.1-cudnn8-devel
+FROM pytorch/pytorch:2.6.0-cuda12.6-cudnn9-devel
 
 WORKDIR /src
 
 RUN apt-get update \
-    && apt-get install -y dotnet-sdk-8.0 \
     && apt-get install software-properties-common -y \
+    && add-apt-repository ppa:dotnet/backports \
+    && apt-get update \
+    && apt-get install -y dotnet-sdk-9.0 \
     && add-apt-repository ppa:mscore-ubuntu/mscore-stable \
     && apt-get update \
     && apt-get install musescore -y \
