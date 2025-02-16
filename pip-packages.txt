@@ -8,3 +8,7 @@ einops
 pretty_midi
 pyFluidSynth
 miditok
+
+einops_exts
+filelock
+joblib
