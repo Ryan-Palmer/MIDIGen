@@ -21,3 +21,6 @@ src/data/midi/lakh_clean/
 src/data/midi/lakh_clean_piano-vg_large/
 src/data/midi/lakh_full_piano-vg_large/
 src/data/midi/vg_large_miditok_split/
+src/9 - Rebuild/.tmp/knn.memories/knn.memory.layer.1.memmap
+src/9 - Rebuild/.tmp/
+src/9 - Rebuild/__pycache__/
