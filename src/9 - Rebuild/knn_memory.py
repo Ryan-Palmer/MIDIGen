@@ -2,6 +2,7 @@ import os
 import math
 import torch
 import faiss
+import faiss.contrib.torch_utils
 import numpy as np
 from pathlib import Path
 from functools import wraps
@@ -20,7 +21,17 @@ FAISS_INDEX_GPU_ID = int(os.getenv('FAISS_INDEX_GPU_ID', 0))
 
 DEFAULT_KNN_MEMORY_MEMMAP_DIRECTORY = './.tmp/knn.memories'
 
+resources = faiss.StandardGpuResources() 
+
 # helper functions
+
+device = (
+    "cuda"
+    if torch.cuda.is_available()
+    else "mps"
+    if torch.backends.mps.is_available()
+    else "cpu"
+)
 
 def exists(val):
     return val is not None
@@ -55,10 +66,9 @@ class KNN():
         dim,
         max_num_entries,
         cap_num_entries = False,
-        M = 15,
         keep_stats = False
     ):
-        index = faiss.IndexHNSWFlat(dim, M, faiss.METRIC_INNER_PRODUCT)
+        index = faiss.GpuIndexFlatL2(resources, dim)
         self.index = index
         self.max_num_entries = max_num_entries
         self.cap_num_entries = cap_num_entries
@@ -106,13 +116,12 @@ class KNN():
         self,
         x,
         topk,
-        nprobe = 8,
         return_distances = False,
         increment_hits = False,
         increment_age = True
     ):
         if not self.is_trained:
-            return np.full((x.shape[0], topk), -1)
+            return torch.full((x.shape[0], topk), -1)
 
         distances, indices = self.index.search(x, k = topk)
 
@@ -135,12 +144,13 @@ class KNN():
 # can automatically take care of a collection of faiss indices (across batch dimension)
 
 class KNNMemory():
+
+    @torch.no_grad()
     def __init__(
         self,
         dim,
         max_memories = 16000,
         num_indices = 1,
-        memmap_filename = './knn.memory.memmap',
         multiprocessing = True
     ):
         self.dim = dim
@@ -151,7 +161,7 @@ class KNNMemory():
         self.shape = (num_indices, max_memories, 2, dim)
         self.db_offsets = np.zeros(num_indices, dtype = np.int32)
 
-        self.db = np.memmap(memmap_filename, mode = 'w+', dtype = np.float32, shape = self.shape)
+        self.db = torch.zeros(self.shape, dtype = torch.float32, device=device)
         self.knns = [KNN(dim = dim, max_num_entries = max_memories, cap_num_entries = True) for _ in range(num_indices)]
     
         self.n_jobs = cpu_count() if multiprocessing else 1
@@ -169,6 +179,7 @@ class KNNMemory():
         yield self
         self.set_scoped_indices(prev_indices)
 
+    @torch.no_grad()
     def clear(self, batch_indices = None):
         if not exists(batch_indices):
             batch_indices = list(range(self.num_indices))
@@ -181,16 +192,16 @@ class KNNMemory():
 
         self.db_offsets[batch_indices] = 0
 
+    @torch.no_grad()
     def add(self, memories):
         check_shape(memories, 'b n kv d', d = self.dim, kv = 2, b = len(self.scoped_indices))
 
-        memories = memories.detach().cpu().numpy()
         memories = memories[:, -self.max_memories:]
         num_memories = memories.shape[1]
 
         knn_insert_ids = np.arange(num_memories)
 
-        keys = np.ascontiguousarray(memories[..., 0, :])
+        keys = memories[..., 0, :].detach().contiguous()
         knns = [self.knns[i] for i in self.scoped_indices]
         db_offsets = [self.db_offsets[i] for i in self.scoped_indices]
 
@@ -208,16 +219,15 @@ class KNNMemory():
         # add the new memories to the memmap "database"
 
         add_indices = (rearrange(np.arange(num_memories), 'j -> 1 j') + rearrange(self.db_offsets[list(self.scoped_indices)], 'i -> i 1')) % self.max_memories
-        self.db[rearrange(np.array(self.scoped_indices), 'i -> i 1'), add_indices] = memories
-        self.db.flush()
+        self.db[rearrange(np.array(self.scoped_indices), 'i -> i 1'), add_indices] = memories.detach()
 
         self.db_offsets += num_memories
 
+    @torch.no_grad()
     def search(
         self,
         queries,
         topk,
-        nprobe = 8,
         increment_hits = True,
         increment_age = True
     ):
@@ -225,7 +235,7 @@ class KNNMemory():
         queries, ps = pack([queries], 'b * d')
 
         device = queries.device
-        queries = queries.detach().cpu().numpy()
+        queries = queries.detach()
 
         all_masks = []
         all_key_values = []
@@ -236,7 +246,7 @@ class KNNMemory():
 
         @delayed
         def knn_search(knn, query):
-            return knn.search(query, topk, nprobe, increment_hits = increment_hits, increment_age = increment_age)
+            return knn.search(query, topk, increment_hits = increment_hits, increment_age = increment_age)
 
         fetched_indices = Parallel(n_jobs = self.n_jobs)(knn_search(*args) for args in zip(knns, queries))
 
@@ -245,21 +255,22 @@ class KNNMemory():
 
         for batch_index, indices in zip(self.scoped_indices, fetched_indices):
             mask = indices !=  -1
-            db_indices = np.where(mask, indices, 0)
 
-            all_masks.append(torch.from_numpy(mask))
+            db_indices = torch.where(mask, indices, 0)
+
+            all_masks.append(mask)
 
             key_values = self.db[batch_index, db_indices % self.max_memories]
-            all_key_values.append(torch.from_numpy(key_values))
+            all_key_values.append(key_values)
 
-        all_masks = torch.stack(all_masks)
-        all_key_values = torch.stack(all_key_values)
+        all_masks = torch.stack(all_masks).to(device)
+        all_key_values = torch.stack(all_key_values).to(device)
         all_key_values = all_key_values.masked_fill(~rearrange(all_masks, '... -> ... 1 1'), 0.)
 
         all_key_values, = unpack(all_key_values, ps, 'b * n kv d')
         all_masks, = unpack(all_masks, ps, 'b * n')
 
-        return all_key_values.to(device), all_masks.to(device)
+        return all_key_values, all_masks
 
     def __del__(self):
         if hasattr(self, 'knns'):
@@ -286,7 +297,7 @@ class KNNMemoryList(list):
         memories_path.mkdir(exist_ok = True, parents = True)
 
         def inner(*args, **kwargs):
-            return self([KNNMemory(*args, num_indices = batch_size, memmap_filename = str(memories_path / f'knn.memory.layer.{ind + 1}.memmap'), **kwargs) for ind in range(num_memory_layers)])
+            return self([KNNMemory(*args, num_indices = batch_size, **kwargs) for ind in range(num_memory_layers)])
         return inner
 
     @contextmanager
