@@ -426,7 +426,7 @@ class MemorizingTransformer(nn.Module):
             yield knn_memories
             knn_memories.cleanup()
 
-    def clear_memory(self, x, token_id):
+    def clear_memory(self, x, token_id, knn_memories):
         """ clears the KNN memories based on if the batch row contains the specified token id """
         """ for auto-clearing KNN memories based on start and end of strings """
 
@@ -458,7 +458,7 @@ class MemorizingTransformer(nn.Module):
         # do the appropriate logic
 
         if exists(self.clear_memories_on_sos_token_id):
-            self.clear_memory(x, self.clear_memories_on_sos_token_id)
+            self.clear_memory(x, self.clear_memories_on_sos_token_id, knn_memories)
 
         # handle XL memories
 
@@ -526,7 +526,7 @@ class MemorizingTransformer(nn.Module):
         # auto-clear KNN memories on end of string token
 
         if exists(self.clear_memories_on_eos_token_id):
-            self.clear_memory(x, self.clear_memories_on_eos_token_id)
+            self.clear_memory(x, self.clear_memories_on_eos_token_id, knn_memories)
 
         # for training
 
