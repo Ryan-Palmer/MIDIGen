@@ -25,3 +25,4 @@ src/9 - Rebuild/.tmp/knn.memories/knn.memory.layer.1.memmap
 src/9 - Rebuild/.tmp/
 src/9 - Rebuild/__pycache__/
 src/data/vocab/
+src/data/midi/
