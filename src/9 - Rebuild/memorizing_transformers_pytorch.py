@@ -547,13 +547,11 @@ class MemorizingTransformer(nn.Module):
         self,
         input_ids,
         max_length,
-        knn_memories = None,
         xl_memories = None,
         eos_token_id = None,
         temperature = 1.0,
         top_k = 0,
-        top_p = 0.9,
-        add_knn_memory = True
+        top_p = 0.9
     ):
         """
         Generates text autoregressively from the model.
@@ -575,74 +573,75 @@ class MemorizingTransformer(nn.Module):
         batch_size = input_ids.shape[0]
         timesteps = input_ids.shape[1]
         
-        # Initialize KNN memories if not provided
-        if knn_memories is None:
-            knn_memories = self.create_knn_memories(batch_size=batch_size)
+        with self.knn_memories_context(batch_size = batch_size) as knn_memories:
+            # Initialize KNN memories if not provided
+            if knn_memories is None:
+                knn_memories = self.create_knn_memories(batch_size=batch_size)
+            
+            # Initialize empty XL memories if needed but not provided
+            if self.num_xl_memory_layers > 0 and xl_memories is None:
+                xl_memories = [None] * self.num_xl_memory_layers
+            
+            # For tracking generated sequence
+            generated = input_ids.clone()
         
-        # Initialize empty XL memories if needed but not provided
-        if self.num_xl_memory_layers > 0 and xl_memories is None:
-            xl_memories = [None] * self.num_xl_memory_layers
-        
-        # For tracking generated sequence
-        generated = input_ids.clone()
-    
-        
-        # Generate tokens
-        for _ in range(max_length - input_ids.shape[1]):
-            # Create a copy of generated that is cropped if needed for the forward pass
-            input_for_model = generated
-            if generated.shape[1] > timesteps:
-                input_for_model = generated[:, -timesteps:]
             
-            # Forward pass
-            if self.num_xl_memory_layers > 0:
-                logits, new_xl_memories = self.forward(
-                    input_for_model, knn_memories, xl_memories=xl_memories, add_knn_memory=add_knn_memory
-                )
-                xl_memories = new_xl_memories
-            else:
-                logits = self.forward(
-                    input_for_model, knn_memories, add_knn_memory=add_knn_memory
-                )
-            
-            # Get logits for next token prediction
-            next_token_logits = logits[:, -1, :]
-            
-            # Apply temperature
-            if temperature != 1.0:
-                next_token_logits = next_token_logits / temperature
-            
-            # Apply top-k filtering
-            if top_k > 0:
-                indices_to_remove = next_token_logits < torch.topk(next_token_logits, top_k)[0][..., -1, None]
-                next_token_logits[indices_to_remove] = -float('Inf')
+            # Generate tokens
+            for _ in range(max_length - input_ids.shape[1]):
+                # Create a copy of generated that is cropped if needed for the forward pass
+                input_for_model = generated
+                if generated.shape[1] > timesteps:
+                    input_for_model = generated[:, -timesteps:]
                 
-            # Apply top-p (nucleus) filtering
-            if top_p < 1.0:
-                sorted_logits, sorted_indices = torch.sort(next_token_logits, descending=True)
-                cumulative_probs = torch.cumsum(F.softmax(sorted_logits, dim=-1), dim=-1)
+                # Forward pass
+                if self.num_xl_memory_layers > 0:
+                    logits, new_xl_memories = self.forward(
+                        input_for_model, knn_memories, xl_memories=xl_memories
+                    )
+                    xl_memories = new_xl_memories
+                else:
+                    logits = self.forward(
+                        input_for_model, knn_memories
+                    )
                 
-                # Remove tokens with cumulative probability above the threshold
-                sorted_indices_to_remove = cumulative_probs > top_p
-                # Shift the indices to the right to keep also the first token above the threshold
-                sorted_indices_to_remove[..., 1:] = sorted_indices_to_remove[..., :-1].clone()
-                sorted_indices_to_remove[..., 0] = 0
+                # Get logits for next token prediction
+                next_token_logits = logits[:, -1, :]
                 
-                # Scatter sorted tensors to original indexing
-                indices_to_remove = sorted_indices_to_remove.scatter(
-                    dim=1, index=sorted_indices, src=sorted_indices_to_remove
-                )
-                next_token_logits[indices_to_remove] = -float('Inf')
+                # Apply temperature
+                if temperature != 1.0:
+                    next_token_logits = next_token_logits / temperature
+                
+                # Apply top-k filtering
+                if top_k > 0:
+                    indices_to_remove = next_token_logits < torch.topk(next_token_logits, top_k)[0][..., -1, None]
+                    next_token_logits[indices_to_remove] = -float('Inf')
+                    
+                # Apply top-p (nucleus) filtering
+                if top_p < 1.0:
+                    sorted_logits, sorted_indices = torch.sort(next_token_logits, descending=True)
+                    cumulative_probs = torch.cumsum(F.softmax(sorted_logits, dim=-1), dim=-1)
+                    
+                    # Remove tokens with cumulative probability above the threshold
+                    sorted_indices_to_remove = cumulative_probs > top_p
+                    # Shift the indices to the right to keep also the first token above the threshold
+                    sorted_indices_to_remove[..., 1:] = sorted_indices_to_remove[..., :-1].clone()
+                    sorted_indices_to_remove[..., 0] = 0
+                    
+                    # Scatter sorted tensors to original indexing
+                    indices_to_remove = sorted_indices_to_remove.scatter(
+                        dim=1, index=sorted_indices, src=sorted_indices_to_remove
+                    )
+                    next_token_logits[indices_to_remove] = -float('Inf')
+                
+                # Sample next token
+                probs = F.softmax(next_token_logits, dim=-1)
+                next_token = torch.multinomial(probs, num_samples=1)
+                
+                # Append next token to generated sequence
+                generated = torch.cat((generated, next_token), dim=1)
+                
+                # Check if all sequences have hit the EOS token
+                if exists(eos_token_id) and (next_token == eos_token_id).all():
+                    break
             
-            # Sample next token
-            probs = F.softmax(next_token_logits, dim=-1)
-            next_token = torch.multinomial(probs, num_samples=1)
-            
-            # Append next token to generated sequence
-            generated = torch.cat((generated, next_token), dim=1)
-            
-            # Check if all sequences have hit the EOS token
-            if exists(eos_token_id) and (next_token == eos_token_id).all():
-                break
-        
         return generated
