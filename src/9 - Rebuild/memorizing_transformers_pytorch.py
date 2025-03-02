@@ -542,3 +542,135 @@ class MemorizingTransformer(nn.Module):
             return loss, new_xl_memories
 
         return loss
+    
+    def generate(
+        self,
+        input_ids,
+        knn_memories,
+        max_length = 100,
+        temperature = 1.0,
+        do_sample = True,
+        top_k = 0,
+        top_p = 0.9,
+        eos_token_id = None,
+        pad_token_id = None,
+        xl_memories = None,
+        add_knn_memory = True,
+        repetition_penalty = 1.0,
+        return_xl_memories = False
+    ):
+        """
+        Generates sequences using autoregressive sampling.
+        
+        Args:
+            input_ids: Starting token ids (batch_size, seq_len)
+            knn_memories: KNN memories to use during generation
+            max_length: Maximum sequence length to generate
+            temperature: Sampling temperature (1.0 = normal, <1.0 = more deterministic)
+            do_sample: Whether to sample or do greedy decoding
+            top_k: Restrict sampling to top-k logits (0 = disabled)
+            top_p: Use nucleus sampling with probability p
+            eos_token_id: Optional token ID to stop generation when encountered
+            pad_token_id: Token ID for padding (defaults to self.pad_id)
+            xl_memories: Initial XL memories (if applicable)
+            add_knn_memory: Whether to add new tokens to KNN memory
+            repetition_penalty: Penalty for repeating tokens (1.0 = disabled)
+            return_xl_memories: Whether to return final XL memories
+        
+        Returns:
+            Generated token ids (batch_size, seq_len)
+        """
+        device = input_ids.device
+        batch_size = input_ids.size(0)
+        
+        # Set default pad_token_id
+        pad_token_id = default(pad_token_id, self.pad_id)
+        
+        # Start with the input ids
+        generated = input_ids.clone()
+        
+        # Track XL memories if used
+        current_xl_memories = xl_memories
+        has_xl_memories = self.num_xl_memory_layers > 0
+        
+        # Generate tokens up to max_length
+        for _ in range(max_length - generated.size(1)):
+            # Get the next token predictions
+            if has_xl_memories:
+                outputs = self.forward(
+                    generated,
+                    knn_memories=knn_memories,
+                    xl_memories=current_xl_memories,
+                    add_knn_memory=add_knn_memory
+                )
+                if isinstance(outputs, tuple):
+                    logits, current_xl_memories = outputs
+                else:
+                    logits = outputs
+            else:
+                logits = self.forward(
+                    generated,
+                    knn_memories=knn_memories,
+                    add_knn_memory=add_knn_memory
+                )
+            
+            # Get the next token logits for the last position only
+            next_token_logits = logits[:, -1, :]
+            
+            # Apply temperature
+            if temperature != 1.0:
+                next_token_logits = next_token_logits / temperature
+            
+            # Apply repetition penalty
+            if repetition_penalty != 1.0:
+                token_ids = generated.tolist()
+                for batch_idx in range(batch_size):
+                    for previous_token in set(token_ids[batch_idx]):
+                        # If the token appears in the sequence, penalize it
+                        if previous_token != pad_token_id:
+                            next_token_logits[batch_idx, previous_token] /= repetition_penalty
+            
+            # Filter with top-k and top-p if needed
+            if do_sample:
+                # Top-k filtering
+                if top_k > 0:
+                    indices_to_remove = next_token_logits < torch.topk(next_token_logits, top_k)[0][..., -1, None]
+                    next_token_logits = next_token_logits.masked_fill(indices_to_remove, -float('Inf'))
+                
+                # Top-p filtering (nucleus sampling)
+                if top_p < 1.0:
+                    sorted_logits, sorted_indices = torch.sort(next_token_logits, descending=True)
+                    cumulative_probs = torch.cumsum(F.softmax(sorted_logits, dim=-1), dim=-1)
+                    
+                    # Remove tokens with cumulative probability above the threshold
+                    sorted_indices_to_remove = cumulative_probs > top_p
+                    # Shift the indices to the right to keep the first token above the threshold
+                    sorted_indices_to_remove[..., 1:] = sorted_indices_to_remove[..., :-1].clone()
+                    sorted_indices_to_remove[..., 0] = 0
+                    
+                    # Scatter sorted tensors to original indexing
+                    indices_to_remove = sorted_indices_to_remove.scatter(
+                        dim=1, index=sorted_indices, src=sorted_indices_to_remove
+                    )
+                    next_token_logits = next_token_logits.masked_fill(indices_to_remove, -float('Inf'))
+                
+                # Sample from the filtered distribution
+                probs = F.softmax(next_token_logits, dim=-1)
+                next_token = torch.multinomial(probs, num_samples=1)
+            else:
+                # Greedy decoding
+                next_token = torch.argmax(next_token_logits, dim=-1, keepdim=True)
+            
+            # Add the sampled token to the sequence
+            generated = torch.cat((generated, next_token), dim=1)
+            
+            # Check if EOS token was generated
+            if exists(eos_token_id):
+                eos_generated = (next_token == eos_token_id).all()
+                if eos_generated:
+                    break
+        
+        if return_xl_memories and has_xl_memories:
+            return generated, current_xl_memories
+        
+        return generated
