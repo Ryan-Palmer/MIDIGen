@@ -11,3 +11,4 @@ miditok
 einops_exts
 filelock
 joblib
+scikit-learn
