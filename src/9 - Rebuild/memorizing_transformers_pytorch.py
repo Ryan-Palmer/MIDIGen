@@ -558,8 +558,6 @@ class MemorizingTransformer(nn.Module):
         Args:
             input_ids (torch.Tensor): Input token ids [batch_size, seq_len]
             max_length (int): Maximum length to generate
-            knn_memories (KNNMemoryList, optional): Pre-initialized KNN memories
-            xl_memories (list, optional): Pre-initialized XL memories
             eos_token_id (int, optional): EOS token id for early stopping. Defaults to None.
             temperature (float, optional): Sampling temperature. Defaults to 1.0.
             top_k (int, optional): K for top-k sampling. Defaults to 0 (disabled).
