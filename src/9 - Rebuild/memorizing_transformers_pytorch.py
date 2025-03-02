@@ -547,7 +547,6 @@ class MemorizingTransformer(nn.Module):
         self,
         input_ids,
         max_length,
-        xl_memories = None,
         eos_token_id = None,
         temperature = 1.0,
         top_k = 0,
@@ -565,18 +564,15 @@ class MemorizingTransformer(nn.Module):
             temperature (float, optional): Sampling temperature. Defaults to 1.0.
             top_k (int, optional): K for top-k sampling. Defaults to 0 (disabled).
             top_p (float, optional): P for nucleus sampling. Defaults to 0.9.
-            add_knn_memory (bool, optional): Whether to add to KNN memory. Defaults to True.
         
         Returns:
             torch.Tensor: Generated token ids [batch_size, max_length]
         """
+        xl_memories = None
         batch_size = input_ids.shape[0]
         timesteps = input_ids.shape[1]
         
         with self.knn_memories_context(batch_size = batch_size) as knn_memories:
-            # Initialize KNN memories if not provided
-            if knn_memories is None:
-                knn_memories = self.create_knn_memories(batch_size=batch_size)
             
             # Initialize empty XL memories if needed but not provided
             if self.num_xl_memory_layers > 0 and xl_memories is None:
@@ -585,7 +581,6 @@ class MemorizingTransformer(nn.Module):
             # For tracking generated sequence
             generated = input_ids.clone()
         
-            
             # Generate tokens
             for _ in range(max_length - input_ids.shape[1]):
                 # Create a copy of generated that is cropped if needed for the forward pass
