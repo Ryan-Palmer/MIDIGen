@@ -12,3 +12,4 @@ einops_exts
 filelock
 joblib
 scikit-learn
+x-transformers
