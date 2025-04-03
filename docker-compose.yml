@@ -3,6 +3,8 @@ services:
     build: .
     volumes:
       - ./src:/src
+    ports:
+      - "8888:8888"
     deploy:
       resources:
         reservations:
